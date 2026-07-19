@@ -1,0 +1,77 @@
+---
+import "../styles/global.css";
+import "../styles/admin.css";
+
+import ThemeToggle from "../components/wiki/ThemeToggle.astro";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "Administrador",
+  description = "Administrador de la enciclopedia personal.",
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    />
+
+    <meta name="description" content={description} />
+
+    <script is:inline>
+      (() => {
+        try {
+          const storedTheme =
+            localStorage.getItem("wiki-theme");
+
+          const preferredTheme = window.matchMedia(
+            "(prefers-color-scheme: dark)",
+          ).matches
+            ? "dark"
+            : "light";
+
+          document.documentElement.dataset.theme =
+            storedTheme || preferredTheme;
+        } catch {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
+
+    <title>{title} — Administrador</title>
+  </head>
+
+  <body class="admin-body">
+    <header class="admin-header">
+      <div class="admin-header__inner">
+        <a href="/admin" class="admin-brand">
+          Administrador
+        </a>
+
+        <nav
+          class="admin-navigation"
+          aria-label="Administración"
+        >
+          <a href="/admin">Resumen</a>
+          <a href="/admin/articulos">Artículos</a>
+          <a href="/">Ver sitio</a>
+        </nav>
+
+        <ThemeToggle />
+      </div>
+    </header>
+
+    <main class="admin-main">
+      <slot />
+    </main>
+  </body>
+</html>

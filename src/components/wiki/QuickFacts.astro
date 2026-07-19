@@ -1,0 +1,355 @@
+---
+import type {
+  QuickFactSection,
+} from "../../types/wiki";
+
+interface Props {
+  title?: string;
+  summary?: string;
+  open?: boolean;
+  sections: QuickFactSection[];
+}
+
+const {
+  title = "Datos rápidos",
+  summary = "",
+  open = false,
+  sections,
+} = Astro.props;
+
+const visibleSections = sections
+  .map((section) => ({
+    ...section,
+    rows: section.rows.filter(
+      (row) => row.value.trim().length > 0,
+    ),
+  }))
+  .filter(
+    (section) =>
+      Boolean(section.title?.trim()) ||
+      section.rows.length > 0,
+  );
+
+function isExternalHref(
+  href: string | undefined,
+): boolean {
+  return Boolean(
+    href?.startsWith("http://") ||
+    href?.startsWith("https://"),
+  );
+}
+---
+
+<details
+  id="datos-rapidos"
+  class="quick-facts"
+  open={open}
+>
+  <summary class="quick-facts__summary">
+    <span class="quick-facts__heading">
+      <strong class="quick-facts__title">
+        {title}
+      </strong>
+
+      {
+        summary && (
+          <span class="quick-facts__description">
+            {summary}
+          </span>
+        )
+      }
+    </span>
+
+    <span
+      class="quick-facts__arrow"
+      aria-hidden="true"
+    ></span>
+  </summary>
+
+  <div class="quick-facts__content">
+    {
+      visibleSections.map((section) => (
+        <section
+          class="quick-facts__section"
+          aria-label={
+            section.title ||
+            "Sección de datos rápidos"
+          }
+        >
+          {
+            section.title && (
+              <p
+                class="quick-facts__section-title"
+                role="heading"
+                aria-level="2"
+              >
+                {section.title}
+              </p>
+            )
+          }
+
+          {
+            section.rows.length > 0 && (
+              <dl class="quick-facts__rows">
+                {section.rows.map((row) => (
+                  <div
+                    class:list={[
+                      "quick-facts__row",
+                      !row.label &&
+                        "quick-facts__row--full",
+                    ]}
+                  >
+                    {
+                      row.label && (
+                        <dt>{row.label}</dt>
+                      )
+                    }
+
+                    <dd>
+                      {
+                        row.href ? (
+                          <a
+                            href={row.href}
+                            target={
+                              isExternalHref(row.href)
+                                ? "_blank"
+                                : undefined
+                            }
+                            rel={
+                              isExternalHref(row.href)
+                                ? "noopener noreferrer"
+                                : undefined
+                            }
+                            class:list={[
+                              isExternalHref(row.href) &&
+                                "quick-facts__external-link",
+                            ]}
+                          >
+                            {row.value}
+                          </a>
+                        ) : (
+                          row.value
+                        )
+                      }
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )
+          }
+        </section>
+      ))
+    }
+  </div>
+</details>
+
+<style>
+  .quick-facts {
+    width: 100%;
+    margin: 20px 0;
+    border: 1px solid var(--border);
+    border-radius: 0;
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 22px;
+  }
+
+  .quick-facts__summary {
+    display: flex;
+    min-height: 54px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    gap: 16px;
+    color: var(--text-heading);
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+  }
+
+  .quick-facts__summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .quick-facts__summary:hover {
+    background: var(--surface-hover);
+  }
+
+  .quick-facts__heading {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .quick-facts__title {
+    flex: 0 0 auto;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 22px;
+  }
+
+  .quick-facts__description {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 22px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .quick-facts__arrow {
+    width: 10px;
+    height: 10px;
+    flex: 0 0 auto;
+    margin-right: 3px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transform-origin: center;
+    transition: transform 150ms ease;
+  }
+
+  .quick-facts[open]
+    .quick-facts__arrow {
+    transform: rotate(225deg);
+  }
+
+  .quick-facts__content {
+    border-top: 1px solid var(--border);
+    background: var(--background);
+  }
+
+  .quick-facts__section {
+    margin: 0;
+    padding: 0;
+  }
+
+  .quick-facts__section + .quick-facts__section {
+    border-top: 1px solid var(--border);
+  }
+
+  .quick-facts__section-title {
+    margin: 0;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--surface-strong);
+    color: var(--text-heading);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 22px;
+    text-align: center;
+  }
+
+  .quick-facts__rows {
+    width: 100%;
+    margin: 0;
+  }
+
+  .quick-facts__row {
+    display: grid;
+    grid-template-columns:
+      minmax(130px, 31%)
+      minmax(0, 1fr);
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .quick-facts__row:last-child {
+    border-bottom: 0;
+  }
+
+  .quick-facts__row dt,
+  .quick-facts__row dd {
+    min-width: 0;
+    margin: 0;
+    padding: 8px 12px;
+    font-size: 14px;
+    line-height: 22px;
+    overflow-wrap: anywhere;
+  }
+
+  .quick-facts__row dt {
+    color: var(--text-heading);
+    font-weight: 700;
+  }
+
+  .quick-facts__row dd {
+    color: var(--text);
+    white-space: pre-line;
+  }
+
+  .quick-facts__row--full {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-facts__row--full dd {
+    text-align: left;
+  }
+
+  .quick-facts__external-link::after {
+    margin-left: 3px;
+    font-size: 0.72em;
+    vertical-align: super;
+    content: "↗";
+  }
+
+  @media (max-width: 600px) {
+    .quick-facts {
+      margin: 18px 0;
+    }
+
+    .quick-facts__summary {
+      min-height: 58px;
+      padding: 10px 12px;
+    }
+
+    .quick-facts__heading {
+      display: block;
+    }
+
+    .quick-facts__description {
+      display: block;
+      margin-top: 1px;
+      font-size: 13px;
+      line-height: 20px;
+      white-space: normal;
+    }
+
+    .quick-facts__row {
+      grid-template-columns:
+        minmax(105px, 36%)
+        minmax(0, 1fr);
+    }
+
+    .quick-facts__row dt,
+    .quick-facts__row dd {
+      padding: 7px 10px;
+      font-size: 14px;
+      line-height: 21px;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .quick-facts__row {
+      grid-template-columns: 1fr;
+    }
+
+    .quick-facts__row dt {
+      padding-bottom: 0;
+    }
+
+    .quick-facts__row dd {
+      padding-top: 2px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .quick-facts__arrow {
+      transition: none;
+    }
+  }
+</style>

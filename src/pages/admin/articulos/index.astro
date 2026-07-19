@@ -1,0 +1,96 @@
+---
+export const prerender = false;
+
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import { localWikiRepository } from "../../../lib/wiki/local-wiki-repository";
+
+const articles = await localWikiRepository.listArticles();
+
+const numberFormatter = new Intl.NumberFormat("es-MX");
+
+const dateFormatter = new Intl.DateTimeFormat("es-MX", {
+  dateStyle: "medium",
+});
+
+const statusLabels = {
+  published: "Publicado",
+  draft: "Borrador",
+  archived: "Archivado",
+};
+---
+
+<AdminLayout
+  title="Artículos"
+  description="Listado administrativo de artículos."
+>
+  <header class="admin-page-header">
+    <div>
+      <h1>Artículos</h1>
+
+      <p>
+        {articles.length}
+        {
+          articles.length === 1
+            ? " artículo registrado"
+            : " artículos registrados"
+        }
+      </p>
+    </div>
+  </header>
+
+  <section class="admin-panel">
+    <div class="admin-table-wrapper">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Artículo</th>
+            <th>Estado</th>
+            <th>Impresiones</th>
+            <th>Actualización</th>
+            <th>Vista pública</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {
+            articles.map((article) => (
+              <tr>
+                <td>
+                  <a
+                    class="admin-table__title"
+                    href={`/admin/articulos/${article.id}`}
+                  >
+                    {article.title}
+                  </a>
+                  <br />
+
+                  <small>/wiki/{article.slug}</small>
+                </td>
+
+                <td>
+                  <span class={`status-badge status-badge--${article.status}`}>
+                    {statusLabels[article.status]}
+                  </span>
+                </td>
+
+                <td>{numberFormatter.format(article.viewCount)}</td>
+
+                <td>{dateFormatter.format(new Date(article.updatedAt))}</td>
+
+                <td>
+                  {article.status === "published" ? (
+                    <a href={`/wiki/${article.slug}`} target="_blank">
+                      Abrir
+                    </a>
+                  ) : (
+                    <span>—</span>
+                  )}
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</AdminLayout>

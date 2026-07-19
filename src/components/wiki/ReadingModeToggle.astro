@@ -1,0 +1,152 @@
+<div
+  class="reading-mode-toggle"
+  role="group"
+  aria-label="Modo de lectura"
+>
+  <button
+    type="button"
+    class="reading-mode-toggle__button"
+    data-reading-mode-option="standard"
+    aria-pressed="true"
+    title="Vista normal"
+  >
+    Normal
+  </button>
+
+  <button
+    type="button"
+    class="reading-mode-toggle__button"
+    data-reading-mode-option="focus"
+    aria-pressed="false"
+    title="Vista de lectura ampliada"
+  >
+    Enfoque
+  </button>
+</div>
+
+<script>
+  type ReadingMode = "standard" | "focus";
+
+  function initializeReadingModeToggle(): void {
+    const root = document.documentElement;
+
+    const buttons =
+      document.querySelectorAll<HTMLButtonElement>(
+        "[data-reading-mode-option]",
+      );
+
+    function getCurrentMode(): ReadingMode {
+      return root.dataset.readingMode === "focus"
+        ? "focus"
+        : "standard";
+    }
+
+    function updateButtons(): void {
+      const currentMode = getCurrentMode();
+
+      buttons.forEach((button) => {
+        const buttonMode =
+          button.dataset.readingModeOption;
+
+        button.setAttribute(
+          "aria-pressed",
+          String(buttonMode === currentMode),
+        );
+      });
+    }
+
+    function setReadingMode(
+      mode: ReadingMode,
+    ): void {
+      root.dataset.readingMode = mode;
+
+      try {
+        localStorage.setItem(
+          "wiki-reading-mode",
+          mode,
+        );
+      } catch {
+        // La vista seguirá funcionando aunque
+        // localStorage no esté disponible.
+      }
+
+      updateButtons();
+    }
+
+    buttons.forEach((button) => {
+      if (button.dataset.readingModeBound === "true") {
+        return;
+      }
+
+      button.dataset.readingModeBound = "true";
+
+      button.addEventListener("click", () => {
+        const requestedMode =
+          button.dataset.readingModeOption;
+
+        setReadingMode(
+          requestedMode === "focus"
+            ? "focus"
+            : "standard",
+        );
+      });
+    });
+
+    updateButtons();
+  }
+
+  initializeReadingModeToggle();
+
+  document.addEventListener(
+    "astro:page-load",
+    initializeReadingModeToggle,
+  );
+</script>
+
+<style>
+  .reading-mode-toggle {
+    display: inline-flex;
+    min-height: 38px;
+    overflow: hidden;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-small);
+    background: var(--background);
+  }
+
+  .reading-mode-toggle__button {
+    min-height: 36px;
+    padding: 5px 10px;
+    border: 0;
+    border-right: 1px solid var(--border-soft);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-interface);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .reading-mode-toggle__button:last-child {
+    border-right: 0;
+  }
+
+  .reading-mode-toggle__button:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+
+  .reading-mode-toggle__button[
+    aria-pressed="true"
+  ] {
+    background: var(--surface-strong);
+    color: var(--text-heading);
+    box-shadow: inset 0 -2px 0 var(--text-heading);
+  }
+
+  @media (max-width: 700px) {
+    .reading-mode-toggle__button {
+      padding-inline: 8px;
+      font-size: 0.7rem;
+    }
+  }
+</style>

@@ -1,0 +1,83 @@
+<button
+  id="theme-toggle"
+  class="theme-toggle"
+  type="button"
+  aria-label="Cambiar a modo oscuro"
+  title="Cambiar tema"
+>
+  <span class="theme-toggle__icon" aria-hidden="true">◐</span>
+  <span class="theme-toggle__text">Tema</span>
+</button>
+
+<script>
+  const button = document.querySelector<HTMLButtonElement>("#theme-toggle");
+
+  function getCurrentTheme(): "light" | "dark" {
+    return document.documentElement.dataset.theme === "dark"
+      ? "dark"
+      : "light";
+  }
+
+  function updateButton(): void {
+    if (!button) return;
+
+    const currentTheme = getCurrentTheme();
+    const nextTheme = currentTheme === "dark" ? "claro" : "oscuro";
+
+    button.setAttribute(
+      "aria-label",
+      `Cambiar a modo ${nextTheme}`,
+    );
+
+    button.setAttribute(
+      "title",
+      `Cambiar a modo ${nextTheme}`,
+    );
+  }
+
+  button?.addEventListener("click", () => {
+    const nextTheme =
+      getCurrentTheme() === "dark" ? "light" : "dark";
+
+    document.documentElement.dataset.theme = nextTheme;
+    localStorage.setItem("wiki-theme", nextTheme);
+
+    updateButton();
+  });
+
+  updateButton();
+</script>
+
+<style>
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 38px;
+    padding: 6px 10px;
+    gap: 7px;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .theme-toggle:hover {
+    background: var(--surface);
+  }
+
+  .theme-toggle__icon {
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+
+  .theme-toggle__text {
+    font-size: 0.875rem;
+  }
+
+  @media (max-width: 680px) {
+    .theme-toggle__text {
+      display: none;
+    }
+  }
+</style>

@@ -1,0 +1,125 @@
+---
+export const prerender = false;
+
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { localWikiRepository } from "../../lib/wiki/local-wiki-repository";
+
+const dashboard =
+  await localWikiRepository.getDashboardData();
+
+const numberFormatter = new Intl.NumberFormat("es-MX");
+
+const dateFormatter = new Intl.DateTimeFormat("es-MX", {
+  dateStyle: "medium",
+});
+
+const statistics = [
+  {
+    label: "Artículos totales",
+    value: dashboard.statistics.totalArticles,
+  },
+  {
+    label: "Publicados",
+    value: dashboard.statistics.publishedArticles,
+  },
+  {
+    label: "Borradores",
+    value: dashboard.statistics.draftArticles,
+  },
+  {
+    label: "Archivados",
+    value: dashboard.statistics.archivedArticles,
+  },
+  {
+    label: "Impresiones",
+    value: dashboard.statistics.totalViews,
+  },
+  {
+    label: "Enlaces pendientes",
+    value: dashboard.statistics.brokenLinkCount,
+  },
+  {
+    label: "Categorías",
+    value: dashboard.statistics.totalCategories,
+  },
+];
+---
+
+<AdminLayout
+  title="Resumen"
+  description="Resumen administrativo de la enciclopedia."
+>
+  <header class="admin-page-header">
+    <div>
+      <h1>Resumen</h1>
+
+      <p>
+        Estado actual del contenido almacenado localmente.
+      </p>
+    </div>
+  </header>
+
+  <section
+    class="admin-stat-grid"
+    aria-label="Estadísticas generales"
+  >
+    {
+      statistics.map((statistic) => (
+        <article class="admin-stat-card">
+          <p class="admin-stat-card__label">
+            {statistic.label}
+          </p>
+
+          <p class="admin-stat-card__value">
+            {numberFormatter.format(statistic.value)}
+          </p>
+        </article>
+      ))
+    }
+  </section>
+
+  <div class="admin-section-grid">
+    <section class="admin-panel">
+      <h2>Artículos más consultados</h2>
+
+      <ol class="admin-list">
+        {
+          dashboard.popularArticles.map((article) => (
+            <li>
+              <a href={`/wiki/${article.slug}`}>
+                {article.title}
+              </a>
+
+              <span class="admin-list__metadata">
+                {numberFormatter.format(article.viewCount)}
+                {" impresiones"}
+              </span>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <section class="admin-panel">
+      <h2>Modificados recientemente</h2>
+
+      <ul class="admin-list">
+        {
+          dashboard.recentlyUpdatedArticles.map(
+            (article) => (
+              <li>
+                <span>{article.title}</span>
+
+                <span class="admin-list__metadata">
+                  {dateFormatter.format(
+                    new Date(article.updatedAt),
+                  )}
+                </span>
+              </li>
+            ),
+          )
+        }
+      </ul>
+    </section>
+  </div>
+</AdminLayout>

@@ -1,0 +1,385 @@
+---
+import "../styles/global.css";
+
+import ReadingModeToggle from "../components/wiki/ReadingModeToggle.astro";
+import SiteLogo from "../components/wiki/SiteLogo.astro";
+import ThemeToggle from "../components/wiki/ThemeToggle.astro";
+
+import type { TocItem } from "../types/wiki";
+
+interface Props {
+  title?: string;
+  description?: string;
+
+  article?: boolean;
+  toc?: TocItem[];
+
+  siteName?: string;
+  siteTagline?: string;
+  footerText?: string;
+
+  showAdminLink?: boolean;
+  adminHref?: string;
+
+  discussionHref?: string;
+  editHref?: string;
+  historyHref?: string;
+}
+
+const {
+  title = "Asterion Lexicon",
+
+  description =
+    "Archivo privado de conocimiento, investigación y documentación.",
+
+  article = false,
+  toc = [],
+
+  siteName = "Asterion Lexicon",
+  siteTagline = "Archivo privado de conocimiento",
+
+  footerText =
+    "Asterion Lexicon · Archivo privado de conocimiento y documentación.",
+
+  showAdminLink = true,
+  adminHref = "/admin",
+
+  discussionHref,
+  editHref,
+  historyHref,
+} = Astro.props;
+
+const documentTitle =
+  title === siteName
+    ? siteName
+    : `${title} — ${siteName}`;
+
+const currentPath = Astro.url.pathname;
+
+const searchQuery =
+  Astro.url.searchParams.get("q") ?? "";
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    />
+
+    <meta
+      name="description"
+      content={description}
+    />
+
+    <meta
+      name="generator"
+      content={Astro.generator}
+    />
+
+    <meta
+      name="application-name"
+      content={siteName}
+    />
+
+    <meta
+      name="color-scheme"
+      content="light dark"
+    />
+
+    <script is:inline>
+      (() => {
+        try {
+          const storedTheme =
+            localStorage.getItem("wiki-theme");
+
+          const prefersDarkTheme =
+            window.matchMedia(
+              "(prefers-color-scheme: dark)",
+            ).matches;
+
+          const preferredTheme =
+            prefersDarkTheme
+              ? "dark"
+              : "light";
+
+          document.documentElement.dataset.theme =
+            storedTheme === "dark" ||
+            storedTheme === "light"
+              ? storedTheme
+              : preferredTheme;
+
+          const storedReadingMode =
+            localStorage.getItem(
+              "wiki-reading-mode",
+            );
+
+          document.documentElement.dataset.readingMode =
+            storedReadingMode === "focus"
+              ? "focus"
+              : "standard";
+        } catch {
+          document.documentElement.dataset.theme =
+            "light";
+
+          document.documentElement.dataset.readingMode =
+            "standard";
+        }
+      })();
+    </script>
+
+    <title>{documentTitle}</title>
+  </head>
+
+  <body id="top">
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a
+          href="/"
+          class="site-brand"
+          aria-label={`Ir a la portada de ${siteName}. ${siteTagline}`}
+        >
+          <SiteLogo />
+        </a>
+
+        <form
+          class="site-search"
+          action="/buscar"
+          method="get"
+          role="search"
+        >
+          <label
+            class="sr-only"
+            for="global-search"
+          >
+            Buscar en {siteName}
+          </label>
+
+          <input
+            id="global-search"
+            name="q"
+            type="search"
+            value={searchQuery}
+            placeholder="Buscar en el archivo"
+            autocomplete="off"
+            enterkeyhint="search"
+          />
+
+          <button type="submit">
+            Buscar
+          </button>
+        </form>
+
+        <nav
+          class="site-header__actions"
+          aria-label="Acciones generales"
+        >
+          <a
+            href="/"
+            class="header-link"
+            aria-current={
+              currentPath === "/"
+                ? "page"
+                : undefined
+            }
+          >
+            Portada
+          </a>
+
+          {
+            showAdminLink && (
+              <a
+                href={adminHref}
+                class="header-link"
+                aria-current={
+                  currentPath.startsWith("/admin")
+                    ? "page"
+                    : undefined
+                }
+              >
+                Admin
+              </a>
+            )
+          }
+
+          <ReadingModeToggle />
+
+          <ThemeToggle />
+        </nav>
+      </div>
+    </header>
+
+    {
+      article ? (
+        <div class="article-workspace">
+          <aside
+            class="article-sidebar article-sidebar--left"
+            aria-label="Contenido del artículo"
+          >
+            <div class="sidebar-sticky">
+              <p class="sidebar-title">
+                Contenido
+              </p>
+
+              {toc.length > 0 ? (
+                <nav
+                  class="article-toc"
+                  aria-label="Índice de secciones"
+                >
+                  <a
+                    href="#inicio"
+                    class="article-toc__main"
+                  >
+                    Inicio
+                  </a>
+
+                  {toc.map((item) => (
+                    <a
+                      href={`#${item.id}`}
+                      class:list={[
+                        "article-toc__link",
+
+                        item.level === 3 &&
+                          "article-toc__link--nested",
+
+                        item.level === 4 &&
+                          "article-toc__link--deep",
+                      ]}
+                    >
+                      {item.label}
+                    </a>
+                  ))}
+                </nav>
+              ) : (
+                <p class="sidebar-empty">
+                  Este artículo todavía no tiene
+                  secciones.
+                </p>
+              )}
+            </div>
+          </aside>
+
+          <main
+            class="article-main"
+            id="inicio"
+          >
+            <nav
+              class="article-toolbar"
+              aria-label="Vistas y acciones del artículo"
+            >
+              <div class="article-toolbar__group">
+                <span
+                  class="article-toolbar__active"
+                  aria-current="page"
+                >
+                  Artículo
+                </span>
+
+                {
+                  discussionHref ? (
+                    <a href={discussionHref}>
+                      Discusión
+                    </a>
+                  ) : (
+                    <span
+                      aria-disabled="true"
+                      title="La discusión todavía no está disponible"
+                    >
+                      Discusión
+                    </span>
+                  )
+                }
+              </div>
+
+              <div class="article-toolbar__group">
+                <span
+                  class="article-toolbar__active"
+                  aria-current="page"
+                >
+                  Leer
+                </span>
+
+                {
+                  editHref && (
+                    <a href={editHref}>
+                      Editar
+                    </a>
+                  )
+                }
+
+                {
+                  historyHref ? (
+                    <a href={historyHref}>
+                      Ver historial
+                    </a>
+                  ) : (
+                    <span
+                      aria-disabled="true"
+                      title="El historial todavía no está disponible"
+                    >
+                      Ver historial
+                    </span>
+                  )
+                }
+              </div>
+            </nav>
+
+            <slot />
+          </main>
+
+          <aside
+            class="article-sidebar article-sidebar--right"
+            aria-label="Herramientas del artículo"
+          >
+            <div class="sidebar-sticky">
+              <p class="sidebar-title">
+                Herramientas
+              </p>
+
+              <nav
+                class="article-tools"
+                aria-label="Herramientas de navegación"
+              >
+                <a href="#top">
+                  Volver arriba
+                </a>
+
+                <a href="#datos-rapidos">
+                  Datos rápidos
+                </a>
+
+                <a href="#articulos-relacionados">
+                  Artículos relacionados
+                </a>
+
+                <a href="#categorias">
+                  Categorías
+                </a>
+
+                <a href="#informacion-articulo">
+                  Información del artículo
+                </a>
+              </nav>
+            </div>
+          </aside>
+        </div>
+      ) : (
+        <main
+          class="site-main"
+          id="contenido-principal"
+        >
+          <slot />
+        </main>
+      )
+    }
+
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <p>{footerText}</p>
+      </div>
+    </footer>
+  </body>
+</html>

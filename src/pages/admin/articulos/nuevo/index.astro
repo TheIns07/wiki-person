@@ -1,0 +1,60 @@
+---
+export const prerender = false;
+
+import ArticleEditorForm from "../../../../components/admin/forms/ArticleEditorForm";
+import AdminLayout from "../../../../layouts/AdminLayout.astro";
+
+import {
+  localWikiRepository,
+} from "../../../../lib/wiki/local-wiki-repository";
+
+const [categories, articles] = await Promise.all([
+  localWikiRepository.listCategories(),
+  localWikiRepository.listArticles(),
+]);
+
+const categoryOptions = categories.map((category) => ({
+  id: category.id,
+  name: category.name,
+}));
+
+const relatedArticleOptions = articles.map((article) => ({
+  id: article.id,
+  title: article.title,
+  status: article.status,
+}));
+---
+
+<AdminLayout
+  title="Nuevo artículo"
+  description="Creación de un nuevo artículo."
+>
+  <header class="admin-page-header">
+    <div>
+      <h1>Nuevo artículo</h1>
+
+      <p>
+        Crea un borrador o publica directamente un nuevo
+        artículo.
+      </p>
+    </div>
+
+    <a
+      href="/admin/articulos"
+      class="admin-button admin-button--secondary"
+    >
+      Volver a artículos
+    </a>
+  </header>
+
+  <ArticleEditorForm
+    client:only="react"
+    mode="create"
+    categories={categoryOptions}
+    relatedArticles={relatedArticleOptions}
+  >
+    <p slot="fallback" class="admin-editor-loading">
+      Cargando editor…
+    </p>
+  </ArticleEditorForm>
+</AdminLayout>

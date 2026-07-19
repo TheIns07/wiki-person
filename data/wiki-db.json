@@ -1,0 +1,282 @@
+{
+  "version": 1,
+  "settings": {
+    "siteName": "Enciclopedia personal",
+    "tagline": "Archivo de conocimiento",
+    "description": "Una enciclopedia personal de consulta y documentación.",
+    "language": "es"
+  },
+  "homepage": {
+    "welcomeTitle": "Bienvenido a la Enciclopedia personal",
+    "welcomeDescription": "Un espacio para documentar temas, investigaciones y acontecimientos conectados mediante hipertexto.",
+    "featuredArticleId": "article-valle-del-yaqui",
+    "recentArticleLimit": 5,
+    "popularArticleLimit": 5,
+    "visibleCategoryIds": [
+      "category-history",
+      "category-geography",
+      "category-sonora"
+    ]
+  },
+  "categories": [
+    {
+      "id": "category-history",
+      "name": "Historia",
+      "slug": "historia",
+      "description": "Artículos relacionados con procesos y acontecimientos históricos.",
+      "parentId": null,
+      "createdAt": "2026-07-19T18:00:00.000Z",
+      "updatedAt": "2026-07-19T18:00:00.000Z"
+    },
+    {
+      "id": "category-geography",
+      "name": "Geografía",
+      "slug": "geografia",
+      "description": "Regiones, territorios y espacios geográficos.",
+      "parentId": null,
+      "createdAt": "2026-07-19T18:00:00.000Z",
+      "updatedAt": "2026-07-19T18:00:00.000Z"
+    },
+    {
+      "id": "category-sonora",
+      "name": "Sonora",
+      "slug": "sonora",
+      "description": "Artículos relacionados con el estado de Sonora.",
+      "parentId": "category-geography",
+      "createdAt": "2026-07-19T18:00:00.000Z",
+      "updatedAt": "2026-07-19T18:00:00.000Z"
+    }
+  ],
+  "articles": [
+    {
+      "id": "article-valle-del-yaqui",
+      "title": "Valle del Yaqui",
+      "slug": "valle-del-yaqui",
+      "subtitle": "Región histórica y agrícola del sur de Sonora",
+      "summary": "Región histórica, geográfica y agrícola organizada alrededor del río Yaqui.",
+      "leadHtml": "<p>El <strong>Valle del Yaqui</strong> es una región geográfica, agrícola e histórica ubicada en el sur del estado mexicano de <a href=\"#\">Sonora</a>. Su desarrollo moderno estuvo relacionado con el aprovechamiento del <a href=\"#\">río Yaqui</a>, la creación de canales de irrigación y la organización territorial de los terrenos agrícolas.</p>",
+      "contentHtml": "<p>La región comprende terrenos situados alrededor de la cuenca baja del río Yaqui. Durante distintos periodos se construyeron obras hidráulicas destinadas a distribuir agua hacia las zonas cultivables.</p><h2 id=\"historia\">Historia</h2><p>La historia del valle está vinculada con los pueblos yaquis, proyectos de colonización, compañías constructoras y posteriores procesos de reparto agrario. La organización territorial fue modificándose conforme avanzaron las obras de irrigación.</p><h2 id=\"organizacion-territorial\">Organización territorial</h2><p>Una característica del valle es el empleo de números para identificar calles, campos y bloques agrícolas. Esta nomenclatura ayudó a describir ubicaciones dentro de una extensa cuadrícula territorial.</p><h2 id=\"vease-tambien\">Véase también</h2><ul><li><a href=\"#\">Río Yaqui</a></li><li><a href=\"#\">Ciudad Obregón</a></li><li><a class=\"missing-link\" href=\"#\">Reparto agrario en Sonora</a></li></ul>",
+      "contentJson": null,
+      "plainText": "El Valle del Yaqui es una región geográfica, agrícola e histórica ubicada en el sur de Sonora. Su historia está vinculada con los pueblos yaquis, la irrigación y el reparto agrario.",
+      "status": "published",
+      "featured": true,
+      "toc": [
+        {
+          "id": "historia",
+          "label": "Historia",
+          "level": 2
+        },
+        {
+          "id": "organizacion-territorial",
+          "label": "Organización territorial",
+          "level": 2
+        },
+        {
+          "id": "vease-tambien",
+          "label": "Véase también",
+          "level": 2
+        }
+      ],
+      "quickFacts": {
+        "enabled": true,
+        "title": "Datos rápidos",
+        "summary": "Ubicación, agricultura y organización territorial",
+        "defaultOpen": false,
+        "sections": [
+          {
+            "id": "section-general",
+            "title": "Información general",
+            "rows": [
+              {
+                "id": "fact-location",
+                "label": "Ubicación",
+                "value": "Sur del estado de Sonora, México"
+              },
+              {
+                "id": "fact-river",
+                "label": "Río principal",
+                "value": "Río Yaqui"
+              },
+              {
+                "id": "fact-city",
+                "label": "Ciudad principal",
+                "value": "Ciudad Obregón"
+              },
+              {
+                "id": "fact-activity",
+                "label": "Actividad destacada",
+                "value": "Agricultura de irrigación"
+              }
+            ]
+          },
+          {
+            "id": "section-territory",
+            "title": "Organización territorial",
+            "rows": [
+              {
+                "id": "fact-system",
+                "label": "Sistema",
+                "value": "Bloques y calles numeradas"
+              },
+              {
+                "id": "fact-development",
+                "label": "Desarrollo",
+                "value": "Finales del siglo XIX y primera mitad del siglo XX"
+              }
+            ]
+          }
+        ]
+      },
+      "categoryIds": [
+        "category-history",
+        "category-geography",
+        "category-sonora"
+      ],
+      "aliases": [
+        "Valle Yaqui",
+        "Valle agrícola del Yaqui"
+      ],
+      "relatedArticleIds": [],
+      "viewCount": 138,
+      "createdAt": "2026-07-19T18:00:00.000Z",
+      "updatedAt": "2026-07-19T18:00:00.000Z",
+      "publishedAt": "2026-07-19T18:00:00.000Z"
+    },
+    {
+      "id": "8dd9d8af-1d18-47bf-bc48-82ad36296580",
+      "title": "San Aurelio",
+      "slug": "san-aurelio",
+      "subtitle": "Ciudad histórica y agrícola del noroeste de México",
+      "summary": "San Aurelio es una ciudad ficticia del noroeste de México, conocida por su desarrollo agrícola, su sistema de canales y la conservación de edificios construidos durante la primera mitad del siglo XX.",
+      "leadHtml": "<p><strong>San Aurelio</strong> es una ciudad ficticia ubicada en el noroeste de México. Fue establecida como asentamiento agrícola durante las primeras décadas del siglo XX y creció alrededor de una estación ferroviaria, un sistema regional de canales y varias zonas de cultivo. Actualmente funciona como centro administrativo y comercial de los poblados cercanos.</p>",
+      "contentHtml": "<h2 id=\"historia\">Historia</h2><p>Los primeros asentamientos permanentes de la región aparecieron cerca de un antiguo paso del río. Durante varios años, el lugar estuvo formado por pequeñas comunidades agrícolas conectadas mediante caminos de tierra.</p><p>La construcción de una estación ferroviaria en 1918 impulsó el crecimiento de la población. Alrededor de la estación se establecieron comercios, talleres, almacenes y oficinas administrativas.</p><h3 id=\"fundacion\">Fundación</h3><p>La fecha tradicional de fundación de San Aurelio es el 14 de abril de 1921. Ese día se aprobó el primer plano urbano, organizado mediante calles rectas y manzanas regulares.</p><p>La plaza central, el mercado y la estación quedaron conectados por la avenida Principal, que posteriormente se convirtió en el eje comercial de la ciudad.</p><h3 id=\"expansion-agricola\">Expansión agrícola</h3><p>Entre 1930 y 1960 se construyeron canales secundarios para llevar agua a nuevas superficies cultivables. La producción regional se concentró inicialmente en trigo, algodón y hortalizas.</p><p>La expansión agrícola atrajo trabajadores, comerciantes y técnicos procedentes de otras regiones.</p><h2 id=\"h2-geografia\">H2: Geografía</h2><p>San Aurelio se encuentra en una llanura de clima seco. La ciudad está rodeada por terrenos agrícolas y pequeños poblados conectados mediante carreteras regionales.</p><p>El río Aurelio atraviesa la parte oriental del municipio, aunque su caudal depende de las lluvias y del funcionamiento de las presas ubicadas río arriba.</p>",
+      "contentJson": null,
+      "plainText": "San Aurelio es una ciudad ficticia ubicada en el noroeste de México. Fue establecida como asentamiento agrícola durante las primeras décadas del siglo XX y creció alrededor de una estación ferroviaria, un sistema regional de canales y varias zonas de cultivo. Actualmente funciona como centro administrativo y comercial de los poblados cercanos. HistoriaLos primeros asentamientos permanentes de la región aparecieron cerca de un antiguo paso del río. Durante varios años, el lugar estuvo formado por pequeñas comunidades agrícolas conectadas mediante caminos de tierra.La construcción de una estación ferroviaria en 1918 impulsó el crecimiento de la población. Alrededor de la estación se establecieron comercios, talleres, almacenes y oficinas administrativas.FundaciónLa fecha tradicional de fundación de San Aurelio es el 14 de abril de 1921. Ese día se aprobó el primer plano urbano, organizado mediante calles rectas y manzanas regulares.La plaza central, el mercado y la estación quedaron conectados por la avenida Principal, que posteriormente se convirtió en el eje comercial de la ciudad.Expansión agrícolaEntre 1930 y 1960 se construyeron canales secundarios para llevar agua a nuevas superficies cultivables. La producción regional se concentró inicialmente en trigo, algodón y hortalizas.La expansión agrícola atrajo trabajadores, comerciantes y técnicos procedentes de otras regiones.H2: GeografíaSan Aurelio se encuentra en una llanura de clima seco. La ciudad está rodeada por terrenos agrícolas y pequeños poblados conectados mediante carreteras regionales.El río Aurelio atraviesa la parte oriental del municipio, aunque su caudal depende de las lluvias y del funcionamiento de las presas ubicadas río arriba.",
+      "status": "published",
+      "featured": false,
+      "toc": [
+        {
+          "id": "historia",
+          "label": "Historia",
+          "level": 2
+        },
+        {
+          "id": "fundacion",
+          "label": "Fundación",
+          "level": 3
+        },
+        {
+          "id": "expansion-agricola",
+          "label": "Expansión agrícola",
+          "level": 3
+        },
+        {
+          "id": "h2-geografia",
+          "label": "H2: Geografía",
+          "level": 2
+        }
+      ],
+      "quickFacts": {
+        "enabled": false,
+        "title": "Datos rápidos",
+        "summary": "",
+        "defaultOpen": false,
+        "sections": []
+      },
+      "categoryIds": [],
+      "aliases": [],
+      "relatedArticleIds": [],
+      "viewCount": 6,
+      "createdAt": "2026-07-19T21:33:09.849Z",
+      "updatedAt": "2026-07-19T21:39:30.370Z",
+      "publishedAt": "2026-07-19T21:33:09.849Z"
+    }
+  ],
+  "revisions": [
+    {
+      "id": "8835c874-3e2b-409a-976b-ccf8b9e1e2ab",
+      "articleId": "8dd9d8af-1d18-47bf-bc48-82ad36296580",
+      "revisionNumber": 1,
+      "title": "Mejores",
+      "slug": "mejores",
+      "subtitle": "IOKNSIOBNDIA",
+      "summary": "IKDNSAPKDNSAPKDNAS",
+      "leadHtml": "<p>Escribe aquí la introducción del artículo.</p>",
+      "contentHtml": "<h2 id=\"primera-seccion\">Primera sección</h2><p>Comienza a escribir el contenido.</p>",
+      "contentJson": null,
+      "plainText": "Escribe aquí la introducción del artículo. Primera secciónComienza a escribir el contenido.",
+      "status": "published",
+      "featured": false,
+      "toc": [
+        {
+          "id": "primera-seccion",
+          "label": "Primera sección",
+          "level": 2
+        }
+      ],
+      "quickFacts": {
+        "enabled": false,
+        "title": "Datos rápidos",
+        "summary": "",
+        "defaultOpen": false,
+        "sections": []
+      },
+      "categoryIds": [],
+      "aliases": [],
+      "relatedArticleIds": [],
+      "publishedAt": "2026-07-19T21:33:09.849Z",
+      "changeNote": "Creación del artículo",
+      "createdAt": "2026-07-19T21:33:09.854Z"
+    },
+    {
+      "id": "d2bc5cf3-5c5d-47ee-a7f0-6a7b06e9e9d1",
+      "articleId": "8dd9d8af-1d18-47bf-bc48-82ad36296580",
+      "revisionNumber": 2,
+      "title": "San Aurelio",
+      "slug": "san-aurelio",
+      "subtitle": "Ciudad histórica y agrícola del noroeste de México",
+      "summary": "San Aurelio es una ciudad ficticia del noroeste de México, conocida por su desarrollo agrícola, su sistema de canales y la conservación de edificios construidos durante la primera mitad del siglo XX.",
+      "leadHtml": "<p><strong>San Aurelio</strong> es una ciudad ficticia ubicada en el noroeste de México. Fue establecida como asentamiento agrícola durante las primeras décadas del siglo XX y creció alrededor de una estación ferroviaria, un sistema regional de canales y varias zonas de cultivo. Actualmente funciona como centro administrativo y comercial de los poblados cercanos.</p>",
+      "contentHtml": "<h2 id=\"historia\">Historia</h2><p>Los primeros asentamientos permanentes de la región aparecieron cerca de un antiguo paso del río. Durante varios años, el lugar estuvo formado por pequeñas comunidades agrícolas conectadas mediante caminos de tierra.</p><p>La construcción de una estación ferroviaria en 1918 impulsó el crecimiento de la población. Alrededor de la estación se establecieron comercios, talleres, almacenes y oficinas administrativas.</p><h3 id=\"fundacion\">Fundación</h3><p>La fecha tradicional de fundación de San Aurelio es el 14 de abril de 1921. Ese día se aprobó el primer plano urbano, organizado mediante calles rectas y manzanas regulares.</p><p>La plaza central, el mercado y la estación quedaron conectados por la avenida Principal, que posteriormente se convirtió en el eje comercial de la ciudad.</p><h3 id=\"expansion-agricola\">Expansión agrícola</h3><p>Entre 1930 y 1960 se construyeron canales secundarios para llevar agua a nuevas superficies cultivables. La producción regional se concentró inicialmente en trigo, algodón y hortalizas.</p><p>La expansión agrícola atrajo trabajadores, comerciantes y técnicos procedentes de otras regiones.</p><h2 id=\"h2-geografia\">H2: Geografía</h2><p>San Aurelio se encuentra en una llanura de clima seco. La ciudad está rodeada por terrenos agrícolas y pequeños poblados conectados mediante carreteras regionales.</p><p>El río Aurelio atraviesa la parte oriental del municipio, aunque su caudal depende de las lluvias y del funcionamiento de las presas ubicadas río arriba.</p>",
+      "contentJson": null,
+      "plainText": "San Aurelio es una ciudad ficticia ubicada en el noroeste de México. Fue establecida como asentamiento agrícola durante las primeras décadas del siglo XX y creció alrededor de una estación ferroviaria, un sistema regional de canales y varias zonas de cultivo. Actualmente funciona como centro administrativo y comercial de los poblados cercanos. HistoriaLos primeros asentamientos permanentes de la región aparecieron cerca de un antiguo paso del río. Durante varios años, el lugar estuvo formado por pequeñas comunidades agrícolas conectadas mediante caminos de tierra.La construcción de una estación ferroviaria en 1918 impulsó el crecimiento de la población. Alrededor de la estación se establecieron comercios, talleres, almacenes y oficinas administrativas.FundaciónLa fecha tradicional de fundación de San Aurelio es el 14 de abril de 1921. Ese día se aprobó el primer plano urbano, organizado mediante calles rectas y manzanas regulares.La plaza central, el mercado y la estación quedaron conectados por la avenida Principal, que posteriormente se convirtió en el eje comercial de la ciudad.Expansión agrícolaEntre 1930 y 1960 se construyeron canales secundarios para llevar agua a nuevas superficies cultivables. La producción regional se concentró inicialmente en trigo, algodón y hortalizas.La expansión agrícola atrajo trabajadores, comerciantes y técnicos procedentes de otras regiones.H2: GeografíaSan Aurelio se encuentra en una llanura de clima seco. La ciudad está rodeada por terrenos agrícolas y pequeños poblados conectados mediante carreteras regionales.El río Aurelio atraviesa la parte oriental del municipio, aunque su caudal depende de las lluvias y del funcionamiento de las presas ubicadas río arriba.",
+      "status": "published",
+      "featured": false,
+      "toc": [
+        {
+          "id": "historia",
+          "label": "Historia",
+          "level": 2
+        },
+        {
+          "id": "fundacion",
+          "label": "Fundación",
+          "level": 3
+        },
+        {
+          "id": "expansion-agricola",
+          "label": "Expansión agrícola",
+          "level": 3
+        },
+        {
+          "id": "h2-geografia",
+          "label": "H2: Geografía",
+          "level": 2
+        }
+      ],
+      "quickFacts": {
+        "enabled": false,
+        "title": "Datos rápidos",
+        "summary": "",
+        "defaultOpen": false,
+        "sections": []
+      },
+      "categoryIds": [],
+      "aliases": [],
+      "relatedArticleIds": [],
+      "publishedAt": "2026-07-19T21:33:09.849Z",
+      "changeNote": "Actualización del artículo",
+      "createdAt": "2026-07-19T21:39:30.370Z"
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+---
+export const prerender = false;
+
+import ArticleEditorForm from "../../../../components/admin/forms/ArticleEditorForm";
+import AdminLayout from "../../../../layouts/AdminLayout.astro";
+
+import { localWikiRepository } from "../../../../lib/wiki/local-wiki-repository";
+
+const articleId = Astro.params.id;
+
+const [article, categories, articles] = articleId
+  ? await Promise.all([
+      localWikiRepository.getArticleById(articleId),
+      localWikiRepository.listCategories(),
+      localWikiRepository.listArticles(),
+    ])
+  : [null, [], []];
+
+if (!article) {
+  Astro.response.status = 404;
+}
+
+const categoryOptions = categories.map((category) => ({
+  id: category.id,
+  name: category.name,
+}));
+
+const relatedArticleOptions = articles
+  .filter((candidate) => candidate.id !== article?.id)
+  .map((candidate) => ({
+    id: candidate.id,
+    title: candidate.title,
+    status: candidate.status,
+  }));
+---
+
+<AdminLayout
+  title={article?.title ?? "Artículo no encontrado"}
+  description="Edición de un artículo."
+>
+  {
+    article ? (
+      <>
+        <header class="admin-page-header">
+          <div>
+            <h1>Editar artículo</h1>
+
+            <p>Modifica el contenido, organización y estado editorial.</p>
+          </div>
+
+          <div class="admin-page-header__actions">
+            <a
+              href={`/admin/articulos/${article.id}/vista-previa`}
+              class="admin-button admin-button--secondary"
+              target="_blank"
+            >
+              Vista previa
+            </a>
+
+            <a
+              href={`/admin/articulos/${article.id}/historial`}
+              class="admin-button admin-button--secondary"
+            >
+              Historial
+            </a>
+
+            <a
+              href="/admin/articulos"
+              class="admin-button admin-button--primary"
+            >
+              Volver a artículos
+            </a>
+          </div>
+        </header>
+
+        <ArticleEditorForm
+          client:only="react"
+          mode="edit"
+          initialArticle={article}
+          categories={categoryOptions}
+          relatedArticles={relatedArticleOptions}
+        >
+          <p slot="fallback" class="admin-editor-loading">
+            Cargando editor…
+          </p>
+        </ArticleEditorForm>
+      </>
+    ) : (
+      <section class="admin-panel admin-not-found">
+        <h1>Artículo no encontrado</h1>
+
+        <p>El artículo solicitado no existe o ya fue eliminado.</p>
+
+        <a href="/admin/articulos">Regresar al listado</a>
+      </section>
+    )
+  }
+</AdminLayout>

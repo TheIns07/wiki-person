@@ -12,6 +12,24 @@
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^7.1.1"
+    "@astrojs/netlify": "^8.1.2",
+    "@astrojs/react": "^6.0.1",
+    "@hookform/resolvers": "^5.4.0",
+    "@tiptap/extension-link": "^3.28.0",
+    "@tiptap/pm": "^3.28.0",
+    "@tiptap/react": "^3.28.0",
+    "@tiptap/starter-kit": "^3.28.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "astro": "^7.1.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-hook-form": "^7.82.0",
+    "sanitize-html": "^2.17.6",
+    "slugify": "^1.6.9",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/sanitize-html": "^2.16.1"
   }
 }

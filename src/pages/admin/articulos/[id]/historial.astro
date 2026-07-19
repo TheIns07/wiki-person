@@ -1,0 +1,87 @@
+---
+export const prerender = false;
+
+import RevisionHistory from "../../../../components/admin/history/RevisionHistory";
+import AdminLayout from "../../../../layouts/AdminLayout.astro";
+
+import {
+  localWikiRepository,
+} from "../../../../lib/wiki/local-wiki-repository";
+
+const articleId = Astro.params.id;
+
+const article = articleId
+  ? await localWikiRepository.getArticleById(
+      articleId,
+    )
+  : null;
+
+if (!article) {
+  Astro.response.status = 404;
+}
+
+const revisions =
+  article && articleId
+    ? await localWikiRepository.listArticleRevisions(
+        articleId,
+      )
+    : [];
+---
+
+<AdminLayout
+  title={
+    article
+      ? `Historial de ${article.title}`
+      : "Artículo no encontrado"
+  }
+>
+  {
+    article && articleId ? (
+      <>
+        <header class="admin-page-header">
+          <div>
+            <h1>Historial de revisiones</h1>
+
+            <p>
+              {article.title} · {revisions.length}
+              {
+                revisions.length === 1
+                  ? " revisión"
+                  : " revisiones"
+              }
+            </p>
+          </div>
+
+          <div class="admin-page-header__actions">
+            <a
+              href={`/admin/articulos/${article.id}`}
+              class="admin-button admin-button--primary"
+            >
+              Volver al editor
+            </a>
+          </div>
+        </header>
+
+        <RevisionHistory
+          client:load
+          articleId={article.id}
+          articleTitle={article.title}
+          revisions={revisions}
+        />
+      </>
+    ) : (
+      <section class="admin-panel admin-not-found">
+        <h1>Artículo no encontrado</h1>
+
+        <p>
+          No es posible mostrar el historial porque el
+          artículo no existe.
+        </p>
+
+        <a href="/admin/articulos">
+          Volver a artículos
+        </a>
+      </section>
+    )
+  }
+</AdminLayout>

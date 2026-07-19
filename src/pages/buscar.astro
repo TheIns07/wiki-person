@@ -1,0 +1,735 @@
+---
+import WikiLayout from "../layouts/WikiLayout.astro";
+
+import wikiDatabase from "../../data/wiki-db.json";
+
+interface DatabaseArticle {
+  id?: string;
+  title: string;
+  subtitle?: string | null;
+  slug: string;
+  status: string;
+  leadHtml?: string;
+  contentHtml?: string;
+  updatedAt?: string;
+}
+
+interface SearchArticle {
+  title: string;
+  subtitle: string;
+  slug: string;
+  excerpt: string;
+  searchableText: string;
+  updatedAt: string | null;
+}
+
+const database = wikiDatabase as {
+  articles?: DatabaseArticle[];
+};
+
+function stripHtml(value = ""): string {
+  return value
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function truncate(
+  value: string,
+  maximumLength = 240,
+): string {
+  if (value.length <= maximumLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maximumLength).trimEnd()}…`;
+}
+
+const publishedArticles =
+  database.articles?.filter(
+    (article) =>
+      article.status === "published",
+  ) ?? [];
+
+const searchIndex: SearchArticle[] =
+  publishedArticles.map((article) => {
+    const leadText = stripHtml(
+      article.leadHtml ?? "",
+    );
+
+    const contentText = stripHtml(
+      article.contentHtml ?? "",
+    );
+
+    const excerpt =
+      leadText ||
+      contentText ||
+      "Este artículo no tiene una descripción disponible.";
+
+    return {
+      title: article.title,
+      subtitle: article.subtitle?.trim() ?? "",
+      slug: article.slug,
+      excerpt: truncate(excerpt),
+      searchableText: [
+        article.title,
+        article.subtitle ?? "",
+        article.slug,
+        leadText,
+        contentText,
+      ]
+        .join(" ")
+        .trim(),
+      updatedAt: article.updatedAt ?? null,
+    };
+  });
+
+const serializedSearchIndex =
+  JSON.stringify(searchIndex).replace(
+    /</g,
+    "\\u003c",
+  );
+---
+
+<WikiLayout
+  title="Buscar"
+  description="Busca artículos publicados en Asterion Lexicon."
+>
+  <section class="search-page">
+    <header class="search-page__header">
+      <p class="search-page__eyebrow">
+        Asterion Lexicon
+      </p>
+
+      <h1>Buscar en el archivo</h1>
+
+      <p class="search-page__description">
+        Busca por título, subtítulo o contenido dentro de
+        los artículos publicados.
+      </p>
+
+      <form
+        id="archive-search-form"
+        class="archive-search"
+        action="/buscar"
+        method="get"
+        role="search"
+      >
+        <label
+          class="sr-only"
+          for="archive-search-input"
+        >
+          Buscar artículos
+        </label>
+
+        <input
+          id="archive-search-input"
+          name="q"
+          type="search"
+          placeholder="Escribe una palabra o tema"
+          autocomplete="off"
+          enterkeyhint="search"
+        />
+
+        <button type="submit">
+          Buscar
+        </button>
+      </form>
+    </header>
+
+    <div
+      id="search-status"
+      class="search-status"
+      aria-live="polite"
+    ></div>
+
+    <div
+      id="search-results"
+      class="search-results"
+    ></div>
+
+    <noscript>
+      <div class="search-empty-state">
+        <h2>JavaScript está desactivado</h2>
+
+        <p>
+          Activa JavaScript para buscar dentro del archivo.
+        </p>
+      </div>
+    </noscript>
+
+    <script
+      id="search-index"
+      type="application/json"
+      set:html={serializedSearchIndex}
+    ></script>
+  </section>
+
+  <script>
+    interface SearchArticle {
+      title: string;
+      subtitle: string;
+      slug: string;
+      excerpt: string;
+      searchableText: string;
+      updatedAt: string | null;
+    }
+
+    const form =
+      document.querySelector<HTMLFormElement>(
+        "#archive-search-form",
+      );
+
+    const input =
+      document.querySelector<HTMLInputElement>(
+        "#archive-search-input",
+      );
+
+    const resultsContainer =
+      document.querySelector<HTMLDivElement>(
+        "#search-results",
+      );
+
+    const statusContainer =
+      document.querySelector<HTMLDivElement>(
+        "#search-status",
+      );
+
+    const indexElement =
+      document.querySelector<HTMLScriptElement>(
+        "#search-index",
+      );
+
+    function normalizeText(
+      value: string,
+    ): string {
+      return value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLocaleLowerCase("es-MX")
+        .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function readSearchIndex(): SearchArticle[] {
+      if (!indexElement?.textContent) {
+        return [];
+      }
+
+      try {
+        const parsedValue = JSON.parse(
+          indexElement.textContent,
+        );
+
+        return Array.isArray(parsedValue)
+          ? parsedValue
+          : [];
+      } catch {
+        return [];
+      }
+    }
+
+    const searchIndex = readSearchIndex();
+
+    function formatDate(
+      value: string | null,
+    ): string | null {
+      if (!value) {
+        return null;
+      }
+
+      const date = new Date(value);
+
+      if (Number.isNaN(date.getTime())) {
+        return null;
+      }
+
+      return new Intl.DateTimeFormat(
+        "es-MX",
+        {
+          dateStyle: "long",
+        },
+      ).format(date);
+    }
+
+    function calculateScore(
+      article: SearchArticle,
+      normalizedQuery: string,
+      terms: string[],
+    ): number {
+      const normalizedTitle =
+        normalizeText(article.title);
+
+      const normalizedSubtitle =
+        normalizeText(article.subtitle);
+
+      const normalizedSlug =
+        normalizeText(article.slug);
+
+      const normalizedContent =
+        normalizeText(article.searchableText);
+
+      let score = 0;
+
+      if (normalizedTitle === normalizedQuery) {
+        score += 100;
+      }
+
+      if (normalizedTitle.startsWith(normalizedQuery)) {
+        score += 60;
+      }
+
+      if (normalizedTitle.includes(normalizedQuery)) {
+        score += 40;
+      }
+
+      if (
+        normalizedSubtitle.includes(
+          normalizedQuery,
+        )
+      ) {
+        score += 20;
+      }
+
+      if (normalizedSlug.includes(normalizedQuery)) {
+        score += 15;
+      }
+
+      for (const term of terms) {
+        if (normalizedTitle.includes(term)) {
+          score += 12;
+        }
+
+        if (normalizedSubtitle.includes(term)) {
+          score += 6;
+        }
+
+        if (normalizedContent.includes(term)) {
+          score += 2;
+        }
+      }
+
+      return score;
+    }
+
+    function createResultElement(
+      article: SearchArticle,
+    ): HTMLElement {
+      const articleElement =
+        document.createElement("article");
+
+      articleElement.className =
+        "search-result";
+
+      const title =
+        document.createElement("h2");
+
+      title.className =
+        "search-result__title";
+
+      const link =
+        document.createElement("a");
+
+      link.href = `/wiki/${encodeURIComponent(
+        article.slug,
+      )}`;
+
+      link.textContent = article.title;
+
+      title.append(link);
+      articleElement.append(title);
+
+      if (article.subtitle) {
+        const subtitle =
+          document.createElement("p");
+
+        subtitle.className =
+          "search-result__subtitle";
+
+        subtitle.textContent =
+          article.subtitle;
+
+        articleElement.append(subtitle);
+      }
+
+      const excerpt =
+        document.createElement("p");
+
+      excerpt.className =
+        "search-result__excerpt";
+
+      excerpt.textContent =
+        article.excerpt;
+
+      articleElement.append(excerpt);
+
+      const formattedDate =
+        formatDate(article.updatedAt);
+
+      if (formattedDate) {
+        const metadata =
+          document.createElement("p");
+
+        metadata.className =
+          "search-result__metadata";
+
+        metadata.textContent =
+          `Última actualización: ${formattedDate}`;
+
+        articleElement.append(metadata);
+      }
+
+      return articleElement;
+    }
+
+    function showEmptyState(
+      titleText: string,
+      descriptionText: string,
+    ): void {
+      if (!resultsContainer) {
+        return;
+      }
+
+      resultsContainer.replaceChildren();
+
+      const emptyState =
+        document.createElement("div");
+
+      emptyState.className =
+        "search-empty-state";
+
+      const title =
+        document.createElement("h2");
+
+      title.textContent = titleText;
+
+      const description =
+        document.createElement("p");
+
+      description.textContent =
+        descriptionText;
+
+      emptyState.append(
+        title,
+        description,
+      );
+
+      resultsContainer.append(emptyState);
+    }
+
+    function runSearch(
+      query: string,
+      updateUrl = false,
+    ): void {
+      const trimmedQuery = query.trim();
+      const normalizedQuery =
+        normalizeText(trimmedQuery);
+
+      if (input) {
+        input.value = trimmedQuery;
+      }
+
+      if (updateUrl) {
+        const url = new URL(
+          window.location.href,
+        );
+
+        if (trimmedQuery) {
+          url.searchParams.set(
+            "q",
+            trimmedQuery,
+          );
+        } else {
+          url.searchParams.delete("q");
+        }
+
+        window.history.pushState(
+          {},
+          "",
+          url,
+        );
+      }
+
+      if (!normalizedQuery) {
+        if (statusContainer) {
+          statusContainer.textContent = "";
+        }
+
+        showEmptyState(
+          "Escribe algo para comenzar",
+          "Puedes buscar nombres, lugares, acontecimientos o palabras contenidas en los artículos.",
+        );
+
+        return;
+      }
+
+      const terms =
+        normalizedQuery.split(" ");
+
+      const matches = searchIndex
+        .map((article) => ({
+          article,
+          score: calculateScore(
+            article,
+            normalizedQuery,
+            terms,
+          ),
+        }))
+        .filter(
+          ({ score }) => score > 0,
+        )
+        .sort(
+          (first, second) =>
+            second.score - first.score ||
+            first.article.title.localeCompare(
+              second.article.title,
+              "es-MX",
+            ),
+        )
+        .map(({ article }) => article);
+
+      if (statusContainer) {
+        statusContainer.textContent =
+          matches.length === 1
+            ? `1 resultado para “${trimmedQuery}”.`
+            : `${matches.length} resultados para “${trimmedQuery}”.`;
+      }
+
+      if (!resultsContainer) {
+        return;
+      }
+
+      resultsContainer.replaceChildren();
+
+      if (matches.length === 0) {
+        showEmptyState(
+          "No encontramos resultados",
+          `No hay artículos publicados que coincidan con “${trimmedQuery}”.`,
+        );
+
+        return;
+      }
+
+      const fragment =
+        document.createDocumentFragment();
+
+      for (const article of matches) {
+        fragment.append(
+          createResultElement(article),
+        );
+      }
+
+      resultsContainer.append(fragment);
+    }
+
+    form?.addEventListener(
+      "submit",
+      (event) => {
+        event.preventDefault();
+
+        runSearch(
+          input?.value ?? "",
+          true,
+        );
+      },
+    );
+
+    window.addEventListener(
+      "popstate",
+      () => {
+        const query =
+          new URLSearchParams(
+            window.location.search,
+          ).get("q") ?? "";
+
+        runSearch(query);
+      },
+    );
+
+    const initialQuery =
+      new URLSearchParams(
+        window.location.search,
+      ).get("q") ?? "";
+
+    runSearch(initialQuery);
+  </script>
+</WikiLayout>
+
+<style>
+  .search-page {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .search-page__header {
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .search-page__eyebrow {
+    margin: 0 0 5px;
+    color: var(--text-muted);
+    font-family: var(--font-interface);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .search-page h1 {
+    margin: 0;
+    color: var(--text-heading);
+    font-family: var(--font-serif);
+    font-size: clamp(2rem, 5vw, 2.8rem);
+    font-weight: 400;
+    line-height: 1.15;
+  }
+
+  .search-page__description {
+    max-width: 680px;
+    margin: 10px 0 22px;
+    color: var(--text-muted);
+  }
+
+  .archive-search {
+    display: flex;
+    width: 100%;
+    max-width: 720px;
+  }
+
+  .archive-search input {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-right: 0;
+    border-radius:
+      var(--radius-small)
+      0
+      0
+      var(--radius-small);
+    outline: none;
+    background: var(--background);
+    color: var(--text);
+  }
+
+  .archive-search input:focus {
+    position: relative;
+    z-index: 1;
+    border-color: var(--focus);
+    box-shadow:
+      inset 0 0 0 1px var(--focus);
+  }
+
+  .archive-search button {
+    height: 44px;
+    padding: 0 20px;
+    border: 1px solid var(--border);
+    border-radius:
+      0
+      var(--radius-small)
+      var(--radius-small)
+      0;
+    background: var(--surface);
+    color: var(--text-heading);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .archive-search button:hover {
+    background: var(--surface-hover);
+  }
+
+  .search-status {
+    min-height: 24px;
+    margin: 22px 0 4px;
+    color: var(--text-muted);
+    font-family: var(--font-interface);
+    font-size: 0.875rem;
+  }
+
+  .search-results {
+    display: grid;
+  }
+
+  .search-result {
+    padding: 22px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .search-result__title {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    font-weight: 400;
+    line-height: 1.3;
+  }
+
+  .search-result__subtitle {
+    margin: 3px 0 7px;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .search-result__excerpt {
+    margin: 0;
+    color: var(--article-text, var(--text));
+    line-height: 26px;
+  }
+
+  .search-result__metadata {
+    margin: 7px 0 0;
+    color: var(--text-subtle);
+    font-family: var(--font-interface);
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .search-empty-state {
+    margin-top: 24px;
+    padding: 28px;
+    border: 1px solid var(--border-soft);
+    background: var(--surface);
+    text-align: center;
+  }
+
+  .search-empty-state h2 {
+    margin: 0;
+    color: var(--text-heading);
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    font-weight: 400;
+  }
+
+  .search-empty-state p {
+    max-width: 560px;
+    margin: 8px auto 0;
+    color: var(--text-muted);
+  }
+
+  @media (max-width: 600px) {
+    .archive-search button {
+      padding-inline: 14px;
+    }
+
+    .search-result {
+      padding: 18px 0;
+    }
+
+    .search-result__title {
+      font-size: 1.3rem;
+    }
+
+    .search-empty-state {
+      padding: 22px 16px;
+    }
+  }
+</style>

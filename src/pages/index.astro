@@ -1,17 +1,144 @@
 ---
+export const prerender = false;
 
+import WikiLayout from "../layouts/WikiLayout.astro";
+import { localWikiRepository } from "../lib/wiki/local-wiki-repository";
+
+const homepageData =
+  await localWikiRepository.getHomepageData();
+
+const formatViews = (views: number): string =>
+  new Intl.NumberFormat("es-MX").format(views);
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<WikiLayout
+  title={homepageData.settings.siteName}
+  description={homepageData.settings.description}
+>
+  <section class="home-welcome">
+    <h1>{homepageData.homepage.welcomeTitle}</h1>
+
+    <p>{homepageData.homepage.welcomeDescription}</p>
+
+    <p class="home-welcome__count">
+      Actualmente contiene
+      <strong>
+        {homepageData.publishedArticleCount}
+      </strong>
+      {
+        homepageData.publishedArticleCount === 1
+          ? " artículo publicado"
+          : " artículos publicados"
+      }.
+    </p>
+  </section>
+
+  <div class="home-grid">
+    <section class="home-panel">
+      <h2>Artículo destacado</h2>
+
+      {
+        homepageData.featuredArticle ? (
+          <>
+            <p>
+              <strong>
+                <a
+                  href={`/wiki/${homepageData.featuredArticle.slug}`}
+                >
+                  {homepageData.featuredArticle.title}
+                </a>
+              </strong>
+            </p>
+
+            <p>
+              {homepageData.featuredArticle.summary}
+            </p>
+
+            <p class="home-panel__metadata">
+              {formatViews(
+                homepageData.featuredArticle.viewCount,
+              )}{" "}
+              impresiones
+            </p>
+          </>
+        ) : (
+          <p>No se ha seleccionado un artículo destacado.</p>
+        )
+      }
+    </section>
+
+    <section class="home-panel">
+      <h2>Artículos recientes</h2>
+
+      {
+        homepageData.recentArticles.length > 0 ? (
+          <ul class="article-list">
+            {homepageData.recentArticles.map((article) => (
+              <li>
+                <a href={`/wiki/${article.slug}`}>
+                  {article.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No hay artículos publicados.</p>
+        )
+      }
+    </section>
+
+    <section class="home-panel">
+      <h2>Más consultados</h2>
+
+      {
+        homepageData.popularArticles.length > 0 ? (
+          <ol class="article-list popular-article-list">
+            {homepageData.popularArticles.map((article) => (
+              <li>
+                <a href={`/wiki/${article.slug}`}>
+                  {article.title}
+                </a>
+
+                <span>
+                  {formatViews(article.viewCount)}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>Todavía no hay información de consultas.</p>
+        )
+      }
+    </section>
+
+    <section class="home-panel">
+      <h2>Categorías principales</h2>
+
+      {
+        homepageData.visibleCategories.length > 0 ? (
+          <ul class="article-list">
+            {homepageData.visibleCategories.map(
+              (category) => (
+                <li>
+                  <a href={`/categoria/${category.slug}`}>
+                    {category.name}
+                  </a>
+
+                  {
+                    category.description && (
+                      <p class="category-description">
+                        {category.description}
+                      </p>
+                    )
+                  }
+                </li>
+              ),
+            )}
+          </ul>
+        ) : (
+          <p>No hay categorías configuradas.</p>
+        )
+      }
+    </section>
+  </div>
+</WikiLayout>

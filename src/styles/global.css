@@ -1,0 +1,1533 @@
+/* =========================================================
+   1. Variables de diseño
+   ========================================================= */
+
+   :root,
+   html[data-theme="light"] {
+     color-scheme: light;
+   
+     --background: #ffffff;
+     --surface: #f8f9fa;
+     --surface-strong: #eaecf0;
+     --surface-hover: #f1f2f3;
+   
+     --text: #202122;
+     --text-heading: #101418;
+     --text-muted: #54595d;
+     --text-subtle: #72777d;
+     --article-text: rgb(32, 33, 34);
+   
+     --border: #a2a9b1;
+     --border-soft: #c8ccd1;
+     --border-subtle: #eaecf0;
+   
+     --link: #3366cc;
+     --link-hover: #2a4b8d;
+     --link-visited: #6b4ba1;
+     --missing-link: #ba0000;
+   
+     --focus: #3366cc;
+     --selection: rgba(51, 102, 204, 0.2);
+   
+     --header-background: rgba(255, 255, 255, 0.97);
+   
+     --font-sans:
+       -apple-system,
+       BlinkMacSystemFont,
+       "Segoe UI",
+       Helvetica,
+       Arial,
+       sans-serif;
+   
+     --font-interface:
+       -apple-system,
+       BlinkMacSystemFont,
+       "Segoe UI",
+       Helvetica,
+       Arial,
+       sans-serif;
+   
+     --font-serif:
+       "Linux Libertine",
+       Georgia,
+       Times,
+       "Source Serif 4",
+       serif;
+   
+     --article-width: 960px;
+     --reading-width: 100%;
+     --workspace-width: 1680px;
+   
+     --left-sidebar-width: 220px;
+     --right-sidebar-width: 200px;
+   
+     --header-height: 72px;
+   
+     --radius-small: 2px;
+     --radius-medium: 4px;
+   }
+   
+   html[data-theme="dark"] {
+     color-scheme: dark;
+   
+     --background: #101112;
+     --surface: #202122;
+     --surface-strong: #27292d;
+     --surface-hover: #2f3136;
+     --article-text: #eaecf0;
+   
+     --text: #eaecf0;
+     --text-heading: #f8f9fa;
+     --text-muted: #b0b3b8;
+     --text-subtle: #8d9299;
+   
+     --border: #72777d;
+     --border-soft: #54595d;
+     --border-subtle: #3f4246;
+   
+     --link: #8ab4f8;
+     --link-hover: #aecbfa;
+     --link-visited: #c5a3ff;
+     --missing-link: #ff8c8c;
+   
+     --focus: #8ab4f8;
+     --selection: rgba(138, 180, 248, 0.25);
+   
+     --header-background: rgba(16, 17, 18, 0.97);
+   }
+   
+   /* =========================================================
+      2. Reinicio general
+      ========================================================= */
+   
+   *,
+   *::before,
+   *::after {
+     box-sizing: border-box;
+   }
+   
+   html {
+     min-width: 320px;
+     min-height: 100%;
+     background: var(--background);
+     scroll-behavior: smooth;
+     scroll-padding-top: 104px;
+   }
+   
+   body {
+     min-height: 100vh;
+     margin: 0;
+     background: var(--background);
+     color: var(--text);
+     font-family: var(--font-sans);
+     font-size: 16px;
+     font-weight: 400;
+     line-height: 26px;
+     text-rendering: optimizeLegibility;
+     -webkit-font-smoothing: auto;
+     -moz-osx-font-smoothing: auto;
+   }
+   
+   ::selection {
+     background: var(--selection);
+   }
+   
+   button,
+   input,
+   textarea,
+   select {
+     font: inherit;
+   }
+   
+   button,
+   input,
+   textarea,
+   select,
+   a,
+   summary {
+     -webkit-tap-highlight-color: transparent;
+   }
+   
+   button {
+     color: inherit;
+   }
+   
+   a {
+     color: var(--link);
+     text-decoration: none;
+   }
+   
+   a:visited {
+     color: var(--link-visited);
+   }
+   
+   a:hover {
+     color: var(--link-hover);
+     text-decoration: underline;
+     text-decoration-thickness: 1px;
+     text-underline-offset: 2px;
+   }
+   
+   a:focus-visible,
+   button:focus-visible,
+   input:focus-visible,
+   textarea:focus-visible,
+   select:focus-visible,
+   summary:focus-visible {
+     outline: 2px solid var(--focus);
+     outline-offset: 2px;
+   }
+   
+   img,
+   svg {
+     display: block;
+     max-width: 100%;
+   }
+   
+   p,
+   ul,
+   ol,
+   dl,
+   blockquote,
+   pre,
+   table,
+   figure {
+     margin-top: 0;
+   }
+   
+   hr {
+     border: 0;
+     border-top: 1px solid var(--border);
+   }
+   
+   code,
+   kbd,
+   samp,
+   pre {
+     font-family:
+       "SFMono-Regular",
+       Consolas,
+       "Liberation Mono",
+       Menlo,
+       monospace;
+   }
+   
+   code {
+     padding: 0.08em 0.3em;
+     border: 1px solid var(--border-soft);
+     border-radius: var(--radius-small);
+     background: var(--surface);
+     font-size: 0.92em;
+   }
+   
+   pre {
+     max-width: 100%;
+     padding: 16px;
+     overflow-x: auto;
+     border: 1px solid var(--border-soft);
+     background: var(--surface);
+     font-size: 0.875rem;
+     line-height: 1.5;
+   }
+   
+   pre code {
+     padding: 0;
+     border: 0;
+     background: transparent;
+   }
+   
+   .sr-only {
+     position: absolute;
+     width: 1px;
+     height: 1px;
+     padding: 0;
+     overflow: hidden;
+     clip: rect(0, 0, 0, 0);
+     white-space: nowrap;
+     border: 0;
+   }
+   
+   /* =========================================================
+      3. Encabezado principal
+      ========================================================= */
+   
+   .site-header {
+     position: sticky;
+     top: 0;
+     z-index: 1000;
+     border-bottom: 1px solid var(--border-soft);
+     background: var(--header-background);
+     backdrop-filter: blur(10px);
+     -webkit-backdrop-filter: blur(10px);
+   }
+   
+   .site-header__inner {
+     display: grid;
+     grid-template-columns:
+       minmax(250px, 1fr)
+       minmax(320px, 520px)
+       minmax(250px, 1fr);
+     align-items: center;
+     width: min(calc(100% - 48px), var(--workspace-width));
+     min-height: var(--header-height);
+     margin: 0 auto;
+     gap: 32px;
+   }
+   
+   .site-brand {
+     display: inline-flex;
+     width: fit-content;
+     min-width: 0;
+     flex-direction: column;
+     color: var(--text-heading);
+     line-height: 1.05;
+   }
+   
+   .site-brand:visited,
+   .site-brand:hover {
+     color: var(--text-heading);
+     text-decoration: none;
+   }
+   
+   .site-brand__name {
+     font-family: var(--font-serif);
+     font-size: 1.55rem;
+     font-weight: 700;
+     line-height: 1.05;
+     letter-spacing: -0.015em;
+   }
+   
+   .site-brand__tagline {
+     margin-top: 6px;
+     color: var(--text-muted);
+     font-family: var(--font-interface);
+     font-size: 0.6875rem;
+     font-weight: 500;
+     line-height: 1;
+     letter-spacing: 0.085em;
+     text-transform: uppercase;
+   }
+   
+   .site-search {
+     display: flex;
+     width: 100%;
+     min-width: 0;
+   }
+   
+   .site-search input {
+     width: 100%;
+     min-width: 0;
+     height: 40px;
+     padding: 7px 12px;
+     border: 1px solid var(--border);
+     border-right: 0;
+     border-radius: var(--radius-small) 0 0 var(--radius-small);
+     outline: none;
+     background: var(--background);
+     color: var(--text);
+     font-family: var(--font-interface);
+     font-size: 0.9375rem;
+   }
+   
+   .site-search input::placeholder {
+     color: var(--text-subtle);
+     opacity: 1;
+   }
+   
+   .site-search input:focus {
+     position: relative;
+     z-index: 1;
+     border-color: var(--focus);
+     box-shadow: inset 0 0 0 1px var(--focus);
+   }
+   
+   .site-search button {
+     height: 40px;
+     padding: 0 17px;
+     border: 1px solid var(--border);
+     border-radius: 0 var(--radius-small) var(--radius-small) 0;
+     background: var(--surface);
+     color: var(--text-heading);
+     font-family: var(--font-interface);
+     font-size: 0.875rem;
+     font-weight: 700;
+     cursor: pointer;
+   }
+   
+   .site-search button:hover {
+     background: var(--surface-hover);
+   }
+   
+   .site-header__actions {
+     display: flex;
+     min-width: 0;
+     align-items: center;
+     justify-content: flex-end;
+     gap: 14px;
+   }
+   
+   .header-link {
+     font-family: var(--font-interface);
+     font-size: 0.875rem;
+     white-space: nowrap;
+   }
+   
+   .header-link[aria-current="page"] {
+     color: var(--text-heading);
+     font-weight: 600;
+   }
+   
+   /* =========================================================
+      4. Páginas generales
+      ========================================================= */
+   
+   .site-main {
+     width: min(calc(100% - 48px), 1200px);
+     margin: 0 auto;
+     padding: 40px 0 72px;
+   }
+   
+   /* =========================================================
+      5. Portada
+      ========================================================= */
+   
+   .home-welcome {
+     padding: 32px;
+     border: 1px solid var(--border-soft);
+     background: var(--surface);
+     text-align: center;
+   }
+   
+   .home-welcome h1 {
+     margin: 0;
+     color: var(--text-heading);
+     font-family: var(--font-serif);
+     font-size: clamp(2rem, 4vw, 2.75rem);
+     font-weight: 400;
+     line-height: 1.15;
+     letter-spacing: -0.02em;
+   }
+   
+   .home-welcome p {
+     max-width: 680px;
+     margin: 12px auto 0;
+     color: var(--text-muted);
+     font-size: 1rem;
+     line-height: 1.625;
+   }
+   
+   .home-welcome__count {
+     font-size: 0.875rem !important;
+   }
+   
+   .home-grid {
+     display: grid;
+     grid-template-columns: repeat(2, minmax(0, 1fr));
+     gap: 20px;
+     margin-top: 24px;
+   }
+   
+   .home-panel {
+     min-width: 0;
+     padding: 22px;
+     border: 1px solid var(--border-soft);
+     background: var(--background);
+   }
+   
+   .home-panel h2 {
+     margin: 0 0 13px;
+     padding-bottom: 6px;
+     border-bottom: 1px solid var(--border);
+     color: var(--text-heading);
+     font-family: var(--font-serif);
+     font-size: 1.5rem;
+     font-weight: 400;
+     line-height: 33px;
+   }
+   
+   .home-panel p {
+     line-height: 26px;
+   }
+   
+   .home-panel p:last-child {
+     margin-bottom: 0;
+   }
+   
+   .home-panel__metadata {
+     color: var(--text-subtle);
+     font-size: 0.75rem;
+     line-height: 1.4;
+   }
+   
+   .article-list {
+     margin: 0;
+     padding-left: 21px;
+   }
+   
+   .article-list li {
+     margin: 5px 0;
+     line-height: 24px;
+   }
+   
+   .popular-article-list li {
+     padding-left: 3px;
+   }
+   
+   .popular-article-list li span {
+     float: right;
+     color: var(--text-subtle);
+     font-size: 0.75rem;
+   }
+   
+   .category-description {
+     margin: 2px 0 9px;
+     color: var(--text-muted);
+     font-size: 0.8125rem;
+     line-height: 1.45;
+   }
+   
+   /* =========================================================
+      6. Área de trabajo del artículo
+      ========================================================= */
+   
+   .article-workspace {
+     display: grid;
+     grid-template-columns:
+       var(--left-sidebar-width)
+       minmax(0, var(--article-width))
+       var(--right-sidebar-width);
+     justify-content: center;
+     width: min(calc(100% - 48px), var(--workspace-width));
+     min-height: calc(100vh - var(--header-height));
+     margin: 0 auto;
+     gap: 40px;
+   }
+   
+   .article-main {
+     min-width: 0;
+     padding: 34px 0 72px;
+   }
+   
+   .article-sidebar {
+     min-width: 0;
+     padding-top: 54px;
+     color: var(--text-muted);
+     font-family: var(--font-interface);
+     font-size: 0.875rem;
+     line-height: 1.45;
+   }
+   
+   .sidebar-sticky {
+     position: sticky;
+     top: 104px;
+     max-height: calc(100vh - 124px);
+     overflow-y: auto;
+     scrollbar-width: thin;
+   }
+   
+   .sidebar-title {
+     margin: 0 0 10px;
+     padding-bottom: 8px;
+     border-bottom: 1px solid var(--border-soft);
+     color: var(--text-heading);
+     font-size: 0.875rem;
+     font-weight: 700;
+   }
+   
+   .sidebar-empty {
+     margin: 0;
+     color: var(--text-subtle);
+     font-size: 0.8125rem;
+     line-height: 1.45;
+   }
+   
+   .article-toc,
+   .article-tools {
+     display: flex;
+     flex-direction: column;
+     gap: 1px;
+   }
+   
+   .article-toc a,
+   .article-tools a {
+     padding: 5px 8px;
+     border-left: 2px solid transparent;
+     color: var(--text-muted);
+     line-height: 1.4;
+   }
+   
+   .article-toc a:visited,
+   .article-tools a:visited {
+     color: var(--text-muted);
+   }
+   
+   .article-toc a:hover,
+   .article-tools a:hover {
+     border-left-color: var(--link);
+     background: var(--surface);
+     color: var(--link);
+     text-decoration: none;
+   }
+   
+   .article-toc__main {
+     color: var(--text-heading) !important;
+     font-weight: 600;
+   }
+   
+   .article-toc__link--nested {
+     padding-left: 22px !important;
+     font-size: 0.8125rem;
+   }
+   
+   .article-toc__link--deep {
+     padding-left: 36px !important;
+     font-size: 0.75rem;
+   }
+   
+   /* =========================================================
+      7. Barra de pestañas
+      ========================================================= */
+   
+   .article-toolbar {
+     display: flex;
+     min-width: 0;
+     min-height: 38px;
+     align-items: flex-end;
+     justify-content: space-between;
+     margin-bottom: 22px;
+     border-bottom: 1px solid var(--border-soft);
+     gap: 24px;
+   }
+   
+   .article-toolbar__group {
+     display: flex;
+     flex: 0 0 auto;
+     align-items: flex-end;
+     gap: 20px;
+   }
+   
+   .article-toolbar a,
+   .article-toolbar span {
+     display: inline-block;
+     padding: 7px 0 6px;
+     color: var(--link);
+     font-family: var(--font-interface);
+     font-size: 0.875rem;
+     line-height: 1.4;
+     white-space: nowrap;
+   }
+   
+   .article-toolbar a:visited {
+     color: var(--link);
+   }
+   
+   .article-toolbar span[aria-disabled="true"] {
+     color: var(--text-subtle);
+     cursor: default;
+   }
+   
+   .article-toolbar__active {
+     margin-bottom: -1px;
+     border-bottom: 2px solid var(--text-heading);
+     color: var(--text-heading) !important;
+     font-weight: 500;
+   }
+   
+   /* =========================================================
+      8. Encabezado del artículo
+      ========================================================= */
+   
+   .wiki-article {
+     width: 100%;
+     min-width: 0;
+     margin: 0;
+     color: var(--text);
+     font-family: var(--font-sans);
+     font-size: 16px;
+     line-height: 26px;
+   }
+   
+   .wiki-heading {
+     max-width: 100%;
+     margin: 0;
+     color: var(--text-heading);
+     font-family: var(--font-serif);
+     font-size: 2.3rem;
+     font-weight: 400;
+     line-height: 1.2;
+     letter-spacing: normal;
+     overflow-wrap: anywhere;
+     word-break: break-word;
+   }
+   
+   .wiki-subtitle {
+     margin: 5px 0 0;
+     color: var(--text-muted);
+     font-family: var(--font-sans);
+     font-size: 1rem;
+     font-weight: 400;
+     line-height: 25.6px;
+   }
+   
+   .wiki-divider {
+     margin: 12px 0 16px;
+     border-top-color: var(--border);
+   }
+   
+   /* =========================================================
+      9. Cuerpo del artículo
+      ========================================================= */
+   
+   .wiki-article p,
+   .wiki-article ul,
+   .wiki-article ol,
+   .wiki-article blockquote,
+   .wiki-article table,
+   .wiki-article pre,
+   .wiki-article dl {
+     max-width: var(--reading-width);
+   }
+   
+   .wiki-article p {
+     margin-bottom: 13px;
+     font-size: 16px;
+     line-height: 26px;
+   }
+   
+   .wiki-article__lead,
+   .wiki-article__lead p {
+     font-size: 16px;
+     line-height: 26px;
+   }
+   
+   .wiki-article__lead > :first-child {
+     margin-top: 0;
+   }
+   
+   .wiki-article__lead > :last-child,
+   .wiki-article__content > :last-child {
+     margin-bottom: 0;
+   }
+   
+   .wiki-article__content {
+     margin-top: 20px;
+   }
+   
+   .wiki-article h2 {
+     max-width: var(--reading-width);
+     margin: 32px 0 12px;
+     padding: 9.6px 0 4px;
+     border-bottom: 1px solid var(--border);
+     color: var(--text-heading);
+     font-family: var(--font-serif);
+     font-size: 24px;
+     font-weight: 400;
+     line-height: 33px;
+     letter-spacing: normal;
+     word-break: break-word;
+   }
+   
+   .wiki-article h3 {
+     max-width: var(--reading-width);
+     margin: 4.8px 0;
+     padding-top: 9.6px;
+     color: var(--text-heading);
+     font-family: var(--font-sans);
+     font-size: 19.2px;
+     font-weight: 700;
+     line-height: 30.72px;
+     word-break: break-word;
+   }
+   
+   .wiki-article h4 {
+     max-width: var(--reading-width);
+     margin: 4.8px 0;
+     padding-top: 7px;
+     color: var(--text-heading);
+     font-family: var(--font-sans);
+     font-size: 16px;
+     font-weight: 700;
+     line-height: 25.6px;
+     word-break: break-word;
+   }
+   
+   .wiki-article h5,
+   .wiki-article h6 {
+     max-width: var(--reading-width);
+     margin: 5px 0;
+     padding-top: 6px;
+     color: var(--text-heading);
+     font-family: var(--font-sans);
+     font-size: 16px;
+     font-weight: 700;
+     line-height: 25.6px;
+   }
+   
+   .wiki-article ul,
+   .wiki-article ol {
+     margin-bottom: 13px;
+     padding-left: 32px;
+   }
+   
+   .wiki-article li {
+     margin: 2px 0;
+     line-height: 26px;
+   }
+   
+   .wiki-article li > ul,
+   .wiki-article li > ol {
+     margin-top: 2px;
+     margin-bottom: 2px;
+   }
+   
+   .wiki-article blockquote {
+     margin: 13px 0;
+     padding: 8px 18px;
+     border-left: 4px solid var(--border);
+     background: var(--surface);
+     color: var(--text-muted);
+   }
+   
+   .wiki-article blockquote p:last-child {
+     margin-bottom: 0;
+   }
+   
+   .wiki-article sup {
+     position: relative;
+     top: -0.35em;
+     font-size: 0.75em;
+     line-height: 0;
+   }
+   
+   .wiki-article sup a {
+     white-space: nowrap;
+   }
+   
+   .wiki-article table {
+     width: 100%;
+     margin: 13px 0;
+     border-collapse: collapse;
+     font-size: 0.875rem;
+     line-height: 1.5;
+   }
+   
+   .wiki-article th,
+   .wiki-article td {
+     padding: 7px 9px;
+     border: 1px solid var(--border-soft);
+     text-align: left;
+     vertical-align: top;
+   }
+   
+   .wiki-article th {
+     background: var(--surface);
+     font-weight: 700;
+   }
+   
+   .missing-link,
+   .missing-link:visited {
+     color: var(--missing-link);
+   }
+   
+   .external-link::after {
+     margin-left: 2px;
+     font-size: 0.72em;
+     vertical-align: super;
+     content: "↗";
+   }
+   
+   .hatnote,
+   .article-note,
+   .main-article-note {
+     margin: 8px 0 13px 32px;
+     color: var(--text);
+     font-style: italic;
+     line-height: 26px;
+   }
+   
+   .hatnote a,
+   .article-note a,
+   .main-article-note a {
+     font-style: italic;
+   }
+   
+   /* =========================================================
+      10. Categorías y contenido secundario
+      ========================================================= */
+   
+   .article-categories {
+     display: flex;
+     max-width: var(--reading-width);
+     margin-top: 40px;
+     padding: 11px 13px;
+     gap: 7px 12px;
+     border: 1px solid var(--border-soft);
+     background: var(--surface);
+     font-family: var(--font-interface);
+     font-size: 0.8125rem;
+     line-height: 1.5;
+   }
+   
+   .article-category-list {
+     display: flex;
+     flex-wrap: wrap;
+     gap: 3px 12px;
+   }
+   
+   .article-category-list a:not(:last-child)::after {
+     margin-left: 12px;
+     color: var(--border);
+     content: "·";
+     pointer-events: none;
+   }
+   
+   .related-articles {
+     max-width: var(--reading-width);
+   }
+   
+   /* =========================================================
+      11. Vista previa administrativa
+      ========================================================= */
+   
+   .article-preview-banner {
+     display: flex;
+     flex-wrap: wrap;
+     align-items: center;
+     margin-bottom: 22px;
+     padding: 10px 13px;
+     gap: 4px 12px;
+     border: 1px solid #a05a00;
+     background: rgba(160, 90, 0, 0.08);
+     color: var(--text);
+     font-family: var(--font-interface);
+     font-size: 0.8125rem;
+     line-height: 1.45;
+   }
+   
+   .article-preview-banner span {
+     color: var(--text-muted);
+   }
+   
+   /* =========================================================
+      12. Página no encontrada
+      ========================================================= */
+   
+   .not-found-page {
+     max-width: 700px;
+     margin: 60px auto;
+     text-align: center;
+   }
+   
+   .not-found-page__code {
+     margin: 0;
+     color: var(--text-subtle);
+     font-family: var(--font-serif);
+     font-size: 5rem;
+     line-height: 1;
+   }
+   
+   .not-found-page h1 {
+     margin: 14px 0 8px;
+     color: var(--text-heading);
+     font-family: var(--font-serif);
+     font-size: 2.25rem;
+     font-weight: 400;
+     line-height: 1.2;
+   }
+   
+   .not-found-page p:not(.not-found-page__code) {
+     color: var(--text-muted);
+   }
+   
+   /* =========================================================
+      13. Pie de página
+      ========================================================= */
+   
+   .site-footer {
+     border-top: 1px solid var(--border-soft);
+     background: var(--background);
+     color: var(--text-muted);
+   }
+   
+   .site-footer__inner {
+     width: min(calc(100% - 48px), var(--workspace-width));
+     margin: 0 auto;
+     padding: 22px 0;
+     font-family: var(--font-interface);
+     font-size: 0.75rem;
+     line-height: 1.5;
+   }
+   
+   .site-footer__inner p {
+     margin: 0;
+   }
+   
+   /* =========================================================
+      14. Responsive del modo normal
+      ========================================================= */
+   
+   @media (max-width: 1380px) {
+     .article-workspace {
+       grid-template-columns:
+         200px
+         minmax(0, 900px);
+       gap: 36px;
+     }
+   
+     .article-sidebar--right {
+       display: none;
+     }
+   }
+   
+   @media (max-width: 1080px) {
+     .site-header__inner {
+       grid-template-columns: minmax(0, 1fr) auto;
+       min-height: auto;
+       padding-top: 12px;
+       gap: 12px 18px;
+     }
+   
+     .site-search {
+       grid-column: 1 / -1;
+       grid-row: 2;
+       padding-bottom: 12px;
+     }
+   
+     .article-workspace {
+       display: block;
+       width: min(calc(100% - 40px), 920px);
+     }
+   
+     .article-sidebar--left,
+     .article-sidebar--right {
+       display: none;
+     }
+   
+     .article-main {
+       padding-top: 26px;
+     }
+   
+     .site-main {
+       width: min(calc(100% - 40px), 1000px);
+     }
+   }
+   
+   @media (max-width: 760px) {
+     .site-header__actions {
+       gap: 8px;
+     }
+   
+     .header-link {
+       display: none;
+     }
+   }
+   
+   @media (max-width: 700px) {
+     :root {
+       --header-height: 60px;
+     }
+   
+     html {
+       scroll-padding-top: 92px;
+     }
+   
+     body {
+       font-size: 16px;
+       line-height: 26px;
+     }
+   
+     .site-header__inner {
+       width: min(calc(100% - 24px), var(--workspace-width));
+     }
+   
+     .site-brand__name {
+       font-size: 1.2rem;
+     }
+   
+     .site-brand__tagline {
+       display: none;
+     }
+   
+     .site-search input,
+     .site-search button {
+       height: 38px;
+     }
+   
+     .site-search button {
+       padding: 0 13px;
+     }
+   
+     .site-main {
+       width: min(calc(100% - 28px), 1000px);
+       padding-top: 22px;
+     }
+   
+     .article-workspace {
+       width: min(calc(100% - 28px), 920px);
+     }
+   
+     .article-main {
+       padding: 20px 0 50px;
+     }
+   
+     .article-toolbar {
+       min-height: 36px;
+       margin-bottom: 18px;
+       overflow-x: auto;
+       scrollbar-width: none;
+     }
+   
+     .article-toolbar::-webkit-scrollbar {
+       display: none;
+     }
+   
+     .article-toolbar__group {
+       gap: 15px;
+     }
+   
+     .article-toolbar a,
+     .article-toolbar span {
+       font-size: 0.8125rem;
+     }
+   
+     .wiki-heading {
+       font-size: 2rem;
+       line-height: 1.17;
+     }
+   
+     .wiki-subtitle {
+       font-size: 0.9375rem;
+       line-height: 1.45;
+     }
+   
+     .wiki-divider {
+       margin-bottom: 13px;
+     }
+   
+     .wiki-article,
+     .wiki-article p,
+     .wiki-article__lead,
+     .wiki-article__lead p {
+       font-size: 16px;
+       line-height: 26px;
+     }
+   
+     .wiki-article h2 {
+       margin-top: 28px;
+       padding-top: 8px;
+       font-size: 24px;
+       line-height: 32px;
+     }
+   
+     .wiki-article h3 {
+       font-size: 19.2px;
+       line-height: 29px;
+     }
+   
+     .wiki-article h4 {
+       font-size: 16px;
+       line-height: 25.6px;
+     }
+   
+     .hatnote,
+     .article-note,
+     .main-article-note {
+       margin-left: 16px;
+     }
+   
+     .article-categories {
+       display: block;
+     }
+   
+     .article-category-list {
+       margin-top: 4px;
+     }
+   
+     .home-welcome {
+       padding: 24px 18px;
+     }
+   
+     .home-grid {
+       grid-template-columns: 1fr;
+     }
+   
+     .home-panel {
+       padding: 19px;
+     }
+   
+     .site-footer__inner {
+       width: min(calc(100% - 28px), var(--workspace-width));
+     }
+   }
+   
+   @media (max-width: 440px) {
+     .site-search button {
+       padding: 0 10px;
+       font-size: 0.8125rem;
+     }
+   
+     .article-toolbar__group:last-child a:last-child,
+     .article-toolbar__group:last-child span:last-child {
+       display: none;
+     }
+   
+     .wiki-heading {
+       font-size: 1.85rem;
+     }
+   
+     .wiki-article ul,
+     .wiki-article ol {
+       padding-left: 24px;
+     }
+   }
+   
+   /* =========================================================
+      15. Modo de lectura Enfoque
+      ========================================================= */
+   
+   html[data-reading-mode="focus"] {
+     --article-width: 1120px;
+     --reading-width: 100%;
+     --workspace-width: 1280px;
+   }
+   
+   /* Encabezado compacto */
+   
+   html[data-reading-mode="focus"] .site-header__inner {
+     grid-template-columns: minmax(220px, 1fr) auto;
+     width: min(calc(100% - 48px), 1280px);
+     min-height: 60px;
+     gap: 22px;
+   }
+   
+   html[data-reading-mode="focus"] .site-search {
+     display: none;
+   }
+   
+   html[data-reading-mode="focus"] .site-brand__tagline {
+     display: none;
+   }
+   
+   html[data-reading-mode="focus"] .site-brand__name {
+     font-size: 1.35rem;
+   }
+   
+   /* Artículo en una sola columna */
+   
+   html[data-reading-mode="focus"] .article-workspace {
+     display: grid;
+     grid-template-columns: minmax(0, var(--article-width));
+     justify-content: center;
+     width: min(calc(100% - 64px), var(--workspace-width));
+     gap: 0;
+   }
+   
+   html[data-reading-mode="focus"] .article-sidebar {
+     display: none;
+   }
+   
+   html[data-reading-mode="focus"] .article-main {
+     min-width: 0;
+     padding: 24px 0 76px;
+   }
+   
+   /* Barra del artículo */
+   
+   html[data-reading-mode="focus"] .article-toolbar {
+     min-height: 44px;
+     margin-bottom: 18px;
+   }
+   
+   html[data-reading-mode="focus"] .article-toolbar a,
+   html[data-reading-mode="focus"] .article-toolbar span {
+     font-size: 1rem;
+     line-height: 1.5;
+   }
+   
+   /* Título e introducción */
+   
+   html[data-reading-mode="focus"] .wiki-heading {
+     font-size: 3.25rem;
+     line-height: 1.15;
+   }
+   
+   html[data-reading-mode="focus"] .wiki-subtitle {
+     font-size: 1.125rem;
+     line-height: 1.55;
+   }
+   
+   html[data-reading-mode="focus"] .wiki-origin {
+     font-size: 1rem;
+     line-height: 26px;
+   }
+   
+   /* Lectura ampliada */
+   
+   html[data-reading-mode="focus"] .wiki-article,
+   html[data-reading-mode="focus"] .wiki-article p,
+   html[data-reading-mode="focus"] .wiki-article li,
+   html[data-reading-mode="focus"] .wiki-article__lead,
+   html[data-reading-mode="focus"] .wiki-article__lead p {
+     font-size: 20px;
+     line-height: 32px;
+   }
+   
+   html[data-reading-mode="focus"] .wiki-article p {
+     margin-bottom: 17px;
+   }
+   
+   html[data-reading-mode="focus"] .wiki-article h2 {
+     margin-top: 39px;
+     padding-top: 11px;
+     font-size: 30px;
+     line-height: 41px;
+   }
+   
+   html[data-reading-mode="focus"] .wiki-article h3 {
+     margin-top: 8px;
+     padding-top: 12px;
+     font-size: 24px;
+     line-height: 38px;
+   }
+   
+   html[data-reading-mode="focus"] .wiki-article h4,
+   html[data-reading-mode="focus"] .wiki-article h5,
+   html[data-reading-mode="focus"] .wiki-article h6 {
+     font-size: 20px;
+     line-height: 32px;
+   }
+   
+   html[data-reading-mode="focus"] .wiki-article ul,
+   html[data-reading-mode="focus"] .wiki-article ol {
+     padding-left: 38px;
+   }
+   
+   html[data-reading-mode="focus"] .hatnote,
+   html[data-reading-mode="focus"] .article-note,
+   html[data-reading-mode="focus"] .main-article-note {
+     font-size: 20px;
+     line-height: 32px;
+   }
+   
+   /* Datos rápidos ampliados */
+   
+   html[data-reading-mode="focus"] .quick-facts {
+     font-size: 16px;
+     line-height: 26px;
+   }
+   
+   html[data-reading-mode="focus"] .quick-facts__title,
+   html[data-reading-mode="focus"] .quick-facts__description,
+   html[data-reading-mode="focus"] .quick-facts__section-title,
+   html[data-reading-mode="focus"] .quick-facts__row dt,
+   html[data-reading-mode="focus"] .quick-facts__row dd {
+     font-size: 16px;
+     line-height: 26px;
+   }
+   
+   /* Información secundaria */
+   
+   html[data-reading-mode="focus"] .article-categories {
+     font-size: 0.9375rem;
+   }
+   
+   html[data-reading-mode="focus"] .article-information-panel {
+     margin-top: 48px;
+   }
+   
+   /* Portada y páginas generales en Enfoque */
+   
+   html[data-reading-mode="focus"] .site-main {
+     width: min(calc(100% - 64px), 1120px);
+   }
+   
+   /* =========================================================
+      16. Responsive del modo Enfoque
+      ========================================================= */
+   
+   @media (max-width: 1080px) {
+     html[data-reading-mode="focus"] .site-header__inner {
+       grid-template-columns: minmax(0, 1fr) auto;
+       padding-top: 0;
+     }
+   
+     html[data-reading-mode="focus"] .article-workspace {
+       display: grid;
+       grid-template-columns: minmax(0, 1fr);
+       width: min(calc(100% - 40px), 960px);
+     }
+   
+     html[data-reading-mode="focus"] .article-main {
+       padding-top: 22px;
+     }
+   }
+   
+   @media (max-width: 700px) {
+     html[data-reading-mode="focus"] .site-header__inner {
+       width: min(calc(100% - 20px), 1280px);
+       min-height: 58px;
+     }
+   
+     html[data-reading-mode="focus"] .site-brand__name {
+       font-size: 1.1rem;
+     }
+   
+     html[data-reading-mode="focus"] .article-workspace {
+       width: min(calc(100% - 24px), 960px);
+     }
+   
+     html[data-reading-mode="focus"] .article-main {
+       padding: 18px 0 52px;
+     }
+   
+     html[data-reading-mode="focus"] .wiki-heading {
+       font-size: 2.25rem;
+       line-height: 1.17;
+     }
+   
+     html[data-reading-mode="focus"] .wiki-subtitle {
+       font-size: 1rem;
+       line-height: 1.5;
+     }
+   
+     html[data-reading-mode="focus"] .wiki-article,
+     html[data-reading-mode="focus"] .wiki-article p,
+     html[data-reading-mode="focus"] .wiki-article li,
+     html[data-reading-mode="focus"] .wiki-article__lead,
+     html[data-reading-mode="focus"] .wiki-article__lead p {
+       font-size: 18px;
+       line-height: 29px;
+     }
+   
+     html[data-reading-mode="focus"] .wiki-article h2 {
+       margin-top: 32px;
+       font-size: 27px;
+       line-height: 36px;
+     }
+   
+     html[data-reading-mode="focus"] .wiki-article h3 {
+       font-size: 22px;
+       line-height: 34px;
+     }
+   
+     html[data-reading-mode="focus"] .wiki-article h4,
+     html[data-reading-mode="focus"] .wiki-article h5,
+     html[data-reading-mode="focus"] .wiki-article h6 {
+       font-size: 18px;
+       line-height: 29px;
+     }
+   
+     html[data-reading-mode="focus"] .quick-facts__title,
+     html[data-reading-mode="focus"] .quick-facts__description,
+     html[data-reading-mode="focus"] .quick-facts__section-title,
+     html[data-reading-mode="focus"] .quick-facts__row dt,
+     html[data-reading-mode="focus"] .quick-facts__row dd {
+       font-size: 15px;
+       line-height: 23px;
+     }
+   
+     html[data-reading-mode="focus"] .site-main {
+       width: min(calc(100% - 24px), 960px);
+     }
+   }
+   
+   @media (max-width: 440px) {
+     html[data-reading-mode="focus"] .wiki-heading {
+       font-size: 2rem;
+     }
+   
+     html[data-reading-mode="focus"] .wiki-article,
+     html[data-reading-mode="focus"] .wiki-article p,
+     html[data-reading-mode="focus"] .wiki-article li,
+     html[data-reading-mode="focus"] .wiki-article__lead,
+     html[data-reading-mode="focus"] .wiki-article__lead p {
+       font-size: 17px;
+       line-height: 28px;
+     }
+   }
+   
+   /* =========================================================
+      17. Accesibilidad
+      ========================================================= */
+   
+   @media (prefers-reduced-motion: reduce) {
+     html {
+       scroll-behavior: auto;
+     }
+   
+     *,
+     *::before,
+     *::after {
+       scroll-behavior: auto !important;
+       transition-duration: 0.01ms !important;
+       animation-duration: 0.01ms !important;
+       animation-iteration-count: 1 !important;
+     }
+   }
+
+   .site-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-heading);
+  }
+  
+  .site-logo__mark {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+  }
+  
+  .site-logo__text {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    line-height: 1.05;
+  }
+  
+  .site-logo__name {
+    font-family: var(--font-serif);
+    font-size: 1.45rem;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: var(--text-heading);
+  }
+  
+  .site-logo__tagline {
+    margin-top: 5px;
+    color: var(--text-muted);
+    font-family: var(--font-interface);
+    font-size: 0.66rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+  
+  .site-logo--compact .site-logo__mark {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .site-logo--compact .site-logo__name {
+    font-size: 1.2rem;
+  }
+  
+  .site-logo--compact .site-logo__tagline {
+    display: none;
+  }
+  @media (max-width: 700px) {
+    .site-logo__mark {
+      width: 34px;
+      height: 34px;
+    }
+  
+    .site-logo__name {
+      font-size: 1.08rem;
+    }
+  
+    .site-logo__tagline {
+      display: none;
+    }
+  }

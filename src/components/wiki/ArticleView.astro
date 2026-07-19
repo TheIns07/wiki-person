@@ -1,0 +1,415 @@
+---
+import type {
+  Article,
+  ArticleStatus,
+  Category,
+} from "../../types/wiki";
+
+import {
+  sanitizeWikiHtml,
+} from "../../lib/wiki/sanitize-wiki-html";
+
+import QuickFacts from "./QuickFacts.astro";
+
+interface Props {
+  article: Article;
+  categories?: Category[];
+  relatedArticles?: Article[];
+  viewCount?: number;
+  preview?: boolean;
+}
+
+const {
+  article,
+  categories = [],
+  relatedArticles = [],
+  viewCount = article.viewCount,
+  preview = false,
+} = Astro.props;
+
+const sanitizedLeadHtml = sanitizeWikiHtml(
+  article.leadHtml,
+);
+
+const sanitizedContentHtml = sanitizeWikiHtml(
+  article.contentHtml,
+);
+
+const numberFormatter = new Intl.NumberFormat(
+  "es-MX",
+);
+
+const dateFormatter = new Intl.DateTimeFormat(
+  "es-MX",
+  {
+    dateStyle: "long",
+  },
+);
+
+function formatDate(
+  value: string | null | undefined,
+): string | null {
+  if (!value) return null;
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return dateFormatter.format(date);
+}
+
+const formattedViews =
+  numberFormatter.format(viewCount);
+
+const formattedCreatedDate =
+  formatDate(article.createdAt);
+
+const formattedUpdateDate =
+  formatDate(article.updatedAt);
+
+const formattedPublishedDate =
+  formatDate(article.publishedAt);
+
+const statusLabels: Record<
+  ArticleStatus,
+  string
+> = {
+  draft: "Borrador",
+  published: "Publicado",
+  archived: "Archivado",
+};
+
+const hasLead =
+  sanitizedLeadHtml.trim().length > 0;
+
+const hasContent =
+  sanitizedContentHtml.trim().length > 0;
+
+const showQuickFacts =
+  article.quickFacts.enabled &&
+  article.quickFacts.sections.length > 0;
+---
+
+<article
+  class="wiki-article"
+  aria-labelledby="article-title"
+>
+  {
+    preview && (
+      <aside
+        class="article-preview-banner"
+        role="status"
+      >
+        <strong>
+          Vista previa administrativa
+        </strong>
+
+        <span>
+          Esta página puede mostrar contenido que todavía
+          no está publicado. Las impresiones no se
+          incrementarán.
+        </span>
+      </aside>
+    )
+  }
+
+  <!-- ===================================================
+       Encabezado del artículo
+       =================================================== -->
+
+  <header class="wiki-article__header">
+    <h1
+      id="article-title"
+      class="wiki-heading"
+    >
+      {article.title}
+    </h1>
+
+    {
+      article.subtitle && (
+        <p class="wiki-subtitle">
+          {article.subtitle}
+        </p>
+      )
+    }
+
+    <hr class="wiki-divider" />
+
+    <p class="wiki-origin">
+      De
+      {" "}
+      <a href="/">
+        Enciclopedia personal
+      </a>
+      , el archivo de conocimiento.
+    </p>
+  </header>
+
+  <!-- ===================================================
+       Introducción
+       =================================================== -->
+
+  {
+    hasLead && (
+      <div
+        class="wiki-article__lead"
+        set:html={sanitizedLeadHtml}
+      />
+    )
+  }
+
+  <!-- ===================================================
+       Datos rápidos
+       =================================================== -->
+
+  {
+    showQuickFacts && (
+      <QuickFacts
+        title={article.quickFacts.title}
+        summary={article.quickFacts.summary}
+        open={article.quickFacts.defaultOpen}
+        sections={article.quickFacts.sections}
+      />
+    )
+  }
+
+  <!-- ===================================================
+       Contenido principal
+       =================================================== -->
+
+  {
+    hasContent ? (
+      <div
+        class="wiki-article__content"
+        set:html={sanitizedContentHtml}
+      />
+    ) : (
+      <p class="wiki-empty-content">
+        Este artículo todavía no tiene contenido principal.
+      </p>
+    )
+  }
+
+  <!-- ===================================================
+       Artículos relacionados
+       =================================================== -->
+
+  {
+    relatedArticles.length > 0 && (
+      <section
+        id="articulos-relacionados"
+        class="related-articles"
+        aria-labelledby="related-articles-title"
+      >
+        <h2 id="related-articles-title">
+          Artículos relacionados
+        </h2>
+
+        <ul>
+          {relatedArticles.map(
+            (relatedArticle) => (
+              <li>
+                <a
+                  href={`/wiki/${relatedArticle.slug}`}
+                >
+                  {relatedArticle.title}
+                </a>
+              </li>
+            ),
+          )}
+        </ul>
+      </section>
+    )
+  }
+
+  <!-- ===================================================
+       Categorías
+       =================================================== -->
+
+  {
+    categories.length > 0 && (
+      <footer
+        id="categorias"
+        class="article-categories"
+        aria-label="Categorías del artículo"
+      >
+        <strong>Categorías:</strong>
+
+        <div class="article-category-list">
+          {categories.map((category) => (
+            <a
+              href={`/categoria/${category.slug}`}
+            >
+              {category.name}
+            </a>
+          ))}
+        </div>
+      </footer>
+    )
+  }
+
+  <!-- ===================================================
+       Información administrativa del artículo
+       =================================================== -->
+
+  <section
+    id="informacion-articulo"
+    class="article-information-panel"
+    aria-labelledby="article-information-title"
+  >
+    <h2
+      id="article-information-title"
+      class="article-information-panel__title"
+    >
+      Información del artículo
+    </h2>
+
+    <dl class="article-information-list">
+      <div>
+        <dt>Estado</dt>
+
+        <dd>
+          {statusLabels[article.status]}
+        </dd>
+      </div>
+
+      {
+        formattedCreatedDate && (
+          <div>
+            <dt>Creación</dt>
+
+            <dd>{formattedCreatedDate}</dd>
+          </div>
+        )
+      }
+
+      {
+        formattedPublishedDate && (
+          <div>
+            <dt>Publicación</dt>
+
+            <dd>{formattedPublishedDate}</dd>
+          </div>
+        )
+      }
+
+      {
+        formattedUpdateDate && (
+          <div>
+            <dt>Última modificación</dt>
+
+            <dd>{formattedUpdateDate}</dd>
+          </div>
+        )
+      }
+
+      <div>
+        <dt>Impresiones</dt>
+
+        <dd>{formattedViews}</dd>
+      </div>
+
+      <div>
+        <dt>Dirección</dt>
+
+        <dd>
+          <code>
+            /wiki/{article.slug}
+          </code>
+        </dd>
+      </div>
+    </dl>
+  </section>
+</article>
+
+<style>
+  .wiki-origin {
+    margin: 0 0 25px;
+    color: var(--text);
+    font-size: 0.875rem;
+    line-height: 22px;
+  }
+
+  .wiki-empty-content {
+    margin-top: 24px;
+    padding: 18px;
+    border: 1px dashed var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    text-align: center;
+  }
+
+  .article-information-panel {
+    max-width: var(--reading-width);
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .article-information-panel__title {
+    margin: 0 0 12px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    color: var(--text-heading);
+    font-family: var(--font-sans) !important;
+    font-size: 0.875rem !important;
+    font-weight: 700 !important;
+    line-height: 22px !important;
+  }
+
+  .article-information-list {
+    display: grid;
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+    margin: 0;
+    gap: 12px 20px;
+    font-family: var(--font-interface);
+  }
+
+  .article-information-list div {
+    min-width: 0;
+  }
+
+  .article-information-list dt {
+    margin-bottom: 2px;
+    color: var(--text-subtle);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+  }
+
+  .article-information-list dd {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+
+  .article-information-list code {
+    font-size: 0.75rem;
+  }
+
+  @media (max-width: 700px) {
+    .wiki-origin {
+      margin-bottom: 21px;
+      font-size: 0.8125rem;
+    }
+
+    .article-information-list {
+      grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 440px) {
+    .article-information-list {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

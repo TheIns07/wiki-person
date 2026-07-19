@@ -1,0 +1,75 @@
+---
+export const prerender = false;
+
+import ArticleView from "../../../../components/wiki/ArticleView.astro";
+import WikiLayout from "../../../../layouts/WikiLayout.astro";
+
+import {
+  localWikiRepository,
+} from "../../../../lib/wiki/local-wiki-repository";
+
+const articleId = Astro.params.id;
+
+const [article, categories, articles] = articleId
+  ? await Promise.all([
+      localWikiRepository.getArticleById(articleId),
+      localWikiRepository.listCategories(),
+      localWikiRepository.listArticles(),
+    ])
+  : [null, [], []];
+
+if (!article) {
+  Astro.response.status = 404;
+}
+
+const articleCategories = article
+  ? categories.filter((category) =>
+      article.categoryIds.includes(category.id),
+    )
+  : [];
+
+const relatedArticles = article
+  ? articles.filter(
+      (candidate) =>
+        candidate.status === "published" &&
+        article.relatedArticleIds.includes(
+          candidate.id,
+        ),
+    )
+  : [];
+---
+
+{
+  article ? (
+    <WikiLayout
+      title={`Vista previa: ${article.title}`}
+      description={article.summary}
+      article
+      toc={article.toc}
+    >
+      <ArticleView
+        article={article}
+        categories={articleCategories}
+        relatedArticles={relatedArticles}
+        preview
+      />
+    </WikiLayout>
+  ) : (
+    <WikiLayout title="Artículo no encontrado">
+      <section class="not-found-page">
+        <p class="not-found-page__code">404</p>
+
+        <h1>Artículo no encontrado</h1>
+
+        <p>
+          No es posible generar la vista previa porque el
+          artículo no existe.
+        </p>
+
+        <a href="/admin/articulos">
+          Volver a artículos
+        </a>
+      </section>
+    </WikiLayout>
+  )
+}
