@@ -104,12 +104,22 @@ export const GET: APIRoute = async ({
       total: articles.length,
     });
   } catch (error) {
-    logApiError(
-      "GET /api/local/articles",
+    console.error(
+      "[GET /api/local/articles]",
       error,
     );
-
-    return apiErrorResponse(error);
+  
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Error desconocido al consultar los artículos.";
+  
+    return jsonResponse(
+      {
+        error: message,
+      },
+      500,
+    );
   }
 };
 
@@ -176,11 +186,21 @@ export const POST: APIRoute = async ({
       201,
     );
   } catch (error) {
-    logApiError(
-      "POST /api/local/articles",
+    console.error(
+      "[POST /api/local/articles]",
       error,
     );
-
-    return apiErrorResponse(error);
+  
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Error desconocido al guardar.";
+  
+    return jsonResponse(
+      {
+        error: message,
+      },
+      500,
+    );
   }
 };
