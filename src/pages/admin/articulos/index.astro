@@ -1,21 +1,262 @@
 ---
-
 import AdminLayout from "../../../layouts/AdminLayout.astro";
-import { localWikiRepository } from "../../../lib/wiki/local-wiki-repository";
 
-const articles = await localWikiRepository.listArticles();
+import {
+  createSupabaseServerClient,
+} from "../../../lib/supabase/server";
 
-const numberFormatter = new Intl.NumberFormat("es-MX");
+import type {
+  ArticleStatus,
+} from "../../../types/wiki";
 
-const dateFormatter = new Intl.DateTimeFormat("es-MX", {
-  dateStyle: "medium",
-});
+export const prerender = false;
 
-const statusLabels = {
+Astro.response.headers.set(
+  "Cache-Control",
+  "private, no-store, max-age=0",
+);
+
+type ArticleRow = {
+  id: string;
+  title: string;
+  slug: string;
+  status: string;
+  updated_at: string;
+};
+
+type ArticleStatsRow = {
+  article_id: string;
+  view_count: number | string | null;
+};
+
+type AdminArticle = {
+  id: string;
+  title: string;
+  slug: string;
+  status: ArticleStatus;
+  updatedAt: string;
+  viewCount: number;
+};
+
+const numberFormatter =
+  new Intl.NumberFormat("es-MX");
+
+const dateFormatter =
+  new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+  });
+
+const statusLabels: Record<
+  ArticleStatus,
+  string
+> = {
   published: "Publicado",
   draft: "Borrador",
   archived: "Archivado",
 };
+
+function normalizeStatus(
+  value: unknown,
+): ArticleStatus {
+  if (
+    value === "published" ||
+    value === "archived"
+  ) {
+    return value;
+  }
+
+  return "draft";
+}
+
+function formatDate(
+  value: string,
+): string {
+  const date = new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return "Fecha desconocida";
+  }
+
+  return dateFormatter.format(date);
+}
+
+function getErrorMessage(
+  error: unknown,
+): string {
+  return error instanceof Error
+    ? error.message
+    : "Ocurrió un error desconocido.";
+}
+
+let articles: AdminArticle[] = [];
+let loadError = "";
+
+try {
+  const supabase =
+    createSupabaseServerClient({
+      request: Astro.request,
+      cookies: Astro.cookies,
+    });
+
+  const {
+    data: {
+      user,
+    },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (
+    userError ||
+    !user
+  ) {
+    return Astro.redirect(
+      "/admin/login?error=Tu%20sesión%20expiró.%20Inicia%20sesión%20nuevamente.",
+    );
+  }
+
+  const {
+    data: profile,
+    error: profileError,
+  } = await supabase
+    .from("profiles")
+    .select("id, role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    throw new Error(
+      `No fue posible verificar tus permisos: ${profileError.message}`,
+    );
+  }
+
+  if (
+    profile?.role !== "admin"
+  ) {
+    return Astro.redirect(
+      "/admin/login?error=Tu%20cuenta%20no%20tiene%20permisos%20de%20administrador.",
+    );
+  }
+
+  /*
+   * Carga todos los artículos desde Supabase:
+   * publicados, borradores y archivados.
+   */
+  const {
+    data: articleData,
+    error: articleError,
+  } = await supabase
+    .from("articles")
+    .select(`
+      id,
+      title,
+      slug,
+      status,
+      updated_at
+    `)
+    .order("updated_at", {
+      ascending: false,
+    });
+
+  if (articleError) {
+    throw new Error(
+      `No fue posible cargar los artículos: ${articleError.message}`,
+    );
+  }
+
+  const articleRows =
+    (articleData ?? []) as ArticleRow[];
+
+  const statsByArticleId =
+    new Map<string, number>();
+
+  /*
+   * Las impresiones se encuentran en article_stats.
+   * Si falla esta consulta, los artículos siguen
+   * mostrándose con cero impresiones.
+   */
+  if (articleRows.length > 0) {
+    const articleIds =
+      articleRows.map(
+        (article) => article.id,
+      );
+
+    const {
+      data: statsData,
+      error: statsError,
+    } = await supabase
+      .from("article_stats")
+      .select(
+        "article_id, view_count",
+      )
+      .in(
+        "article_id",
+        articleIds,
+      );
+
+    if (statsError) {
+      console.warn(
+        "[GET /admin/articulos] No fue posible cargar las impresiones:",
+        statsError,
+      );
+    } else {
+      const statsRows =
+        (statsData ??
+          []) as ArticleStatsRow[];
+
+      for (
+        const statsRow of statsRows
+      ) {
+        statsByArticleId.set(
+          statsRow.article_id,
+          Number(
+            statsRow.view_count ?? 0,
+          ),
+        );
+      }
+    }
+  }
+
+  articles =
+    articleRows.map(
+      (articleRow) => ({
+        id:
+          articleRow.id,
+
+        title:
+          articleRow.title,
+
+        slug:
+          articleRow.slug,
+
+        status:
+          normalizeStatus(
+            articleRow.status,
+          ),
+
+        updatedAt:
+          articleRow.updated_at,
+
+        viewCount:
+          statsByArticleId.get(
+            articleRow.id,
+          ) ?? 0,
+      }),
+    );
+} catch (error) {
+  console.error(
+    "[GET /admin/articulos]",
+    error,
+  );
+
+  loadError =
+    getErrorMessage(error);
+
+  Astro.response.status = 500;
+}
 ---
 
 <AdminLayout
@@ -27,69 +268,146 @@ const statusLabels = {
       <h1>Artículos</h1>
 
       <p>
-        {articles.length}
         {
-          articles.length === 1
-            ? " artículo registrado"
-            : " artículos registrados"
+          loadError
+            ? "No fue posible cargar el listado."
+            : `${articles.length}${
+                articles.length === 1
+                  ? " artículo registrado"
+                  : " artículos registrados"
+              }`
         }
       </p>
     </div>
+
+    <div class="admin-page-header__actions">
+      <a
+        href="/admin/articulos/nuevo"
+        class="admin-button admin-button--primary"
+      >
+        Nuevo artículo
+      </a>
+    </div>
   </header>
 
-  <section class="admin-panel">
-    <div class="admin-table-wrapper">
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>Artículo</th>
-            <th>Estado</th>
-            <th>Impresiones</th>
-            <th>Actualización</th>
-            <th>Vista pública</th>
-          </tr>
-        </thead>
+  {
+    loadError ? (
+      <section class="admin-panel">
+        <h2>
+          Error al cargar los artículos
+        </h2>
 
-        <tbody>
-          {
-            articles.map((article) => (
+        <p>
+          {loadError}
+        </p>
+
+        <p>
+          <a href="/admin/articulos">
+            Volver a intentar
+          </a>
+        </p>
+      </section>
+    ) : (
+      <section class="admin-panel">
+        <div class="admin-table-wrapper">
+          <table class="admin-table">
+            <thead>
               <tr>
-                <td>
-                  <a
-                    class="admin-table__title"
-                    href={`/admin/articulos/${article.id}`}
-                  >
-                    {article.title}
-                  </a>
-                  <br />
-
-                  <small>/wiki/{article.slug}</small>
-                </td>
-
-                <td>
-                  <span class={`status-badge status-badge--${article.status}`}>
-                    {statusLabels[article.status]}
-                  </span>
-                </td>
-
-                <td>{numberFormatter.format(article.viewCount)}</td>
-
-                <td>{dateFormatter.format(new Date(article.updatedAt))}</td>
-
-                <td>
-                  {article.status === "published" ? (
-                    <a href={`/wiki/${article.slug}`} target="_blank">
-                      Abrir
-                    </a>
-                  ) : (
-                    <span>—</span>
-                  )}
-                </td>
+                <th>Artículo</th>
+                <th>Estado</th>
+                <th>Impresiones</th>
+                <th>Actualización</th>
+                <th>Vista pública</th>
               </tr>
-            ))
-          }
-        </tbody>
-      </table>
-    </div>
-  </section>
+            </thead>
+
+            <tbody>
+              {
+                articles.length > 0 ? (
+                  articles.map(
+                    (article) => (
+                      <tr>
+                        <td>
+                          <a
+                            class="admin-table__title"
+                            href={`/admin/articulos/${article.id}`}
+                          >
+                            {article.title}
+                          </a>
+
+                          <br />
+
+                          <small>
+                            /wiki/{article.slug}
+                          </small>
+                        </td>
+
+                        <td>
+                          <span
+                            class={`status-badge status-badge--${article.status}`}
+                          >
+                            {
+                              statusLabels[
+                                article.status
+                              ]
+                            }
+                          </span>
+                        </td>
+
+                        <td>
+                          {
+                            numberFormatter.format(
+                              article.viewCount,
+                            )
+                          }
+                        </td>
+
+                        <td>
+                          {
+                            formatDate(
+                              article.updatedAt,
+                            )
+                          }
+                        </td>
+
+                        <td>
+                          {
+                            article.status ===
+                            "published" ? (
+                              <a
+                                href={`/wiki/${article.slug}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Abrir
+                              </a>
+                            ) : (
+                              <span>—</span>
+                            )
+                          }
+                        </td>
+                      </tr>
+                    ),
+                  )
+                ) : (
+                  <tr>
+                    <td colspan="5">
+                      <p>
+                        No hay artículos registrados
+                        en Supabase.
+                      </p>
+
+                      <a href="/admin/articulos/nuevo">
+                        Crear un artículo
+                      </a>
+                    </td>
+                  </tr>
+                )
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    )
+  }
 </AdminLayout>
