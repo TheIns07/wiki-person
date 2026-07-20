@@ -10,10 +10,6 @@ import {
   readJsonRequest,
 } from "../../../../lib/wiki/api-response";
 
-import {
-  localWikiRepository,
-} from "../../../../lib/wiki/local-wiki-repository";
-
 import type {
   ArticleStatus,
 } from "../../../../types/wiki";
@@ -26,13 +22,56 @@ const validStatuses: ArticleStatus[] = [
   "archived",
 ];
 
-export const GET: APIRoute = async ({ url }) => {
+/**
+ * La importación dinámica permite capturar errores ocurridos
+ * al cargar local-wiki-repository y sus dependencias.
+ */
+async function getLocalWikiRepository() {
+  const module = await import(
+    "../../../../lib/wiki/local-wiki-repository"
+  );
+
+  return module.localWikiRepository;
+}
+
+function logApiError(
+  route: string,
+  error: unknown,
+): void {
+  console.error(
+    `[${route}] Error`,
+    error,
+  );
+
+  if (error instanceof Error) {
+    console.error(
+      `[${route}] Mensaje:`,
+      error.message,
+    );
+
+    if (error.stack) {
+      console.error(
+        `[${route}] Stack:`,
+        error.stack,
+      );
+    }
+  }
+}
+
+export const GET: APIRoute = async ({
+  url,
+}) => {
+  console.log(
+    "[GET /api/local/articles] Solicitud recibida",
+  );
+
   try {
     const requestedStatus =
       url.searchParams.get("status");
 
     const search =
-      url.searchParams.get("search") ?? undefined;
+      url.searchParams.get("search") ??
+      undefined;
 
     const status =
       requestedStatus &&
@@ -42,38 +81,106 @@ export const GET: APIRoute = async ({ url }) => {
         ? (requestedStatus as ArticleStatus)
         : undefined;
 
+    const localWikiRepository =
+      await getLocalWikiRepository();
+
     const articles =
       await localWikiRepository.listArticles({
         status,
         search,
       });
 
+    console.log(
+      "[GET /api/local/articles] Consulta completada",
+      {
+        status: status ?? "all",
+        search: search ?? null,
+        total: articles.length,
+      },
+    );
+
     return jsonResponse({
       data: articles,
       total: articles.length,
     });
   } catch (error) {
+    logApiError(
+      "GET /api/local/articles",
+      error,
+    );
+
     return apiErrorResponse(error);
   }
 };
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({
+  request,
+}) => {
+  console.log(
+    "[POST /api/local/articles] Solicitud recibida",
+  );
+
   try {
-    const body = await readJsonRequest(request);
+    const body =
+      await readJsonRequest(request);
+
+    const articleInput =
+      body as ArticleEditorInput;
+
+    console.log(
+      "[POST /api/local/articles] Datos recibidos",
+      {
+        title:
+          typeof articleInput.title ===
+          "string"
+            ? articleInput.title
+            : null,
+
+        slug:
+          typeof articleInput.slug ===
+          "string"
+            ? articleInput.slug
+            : null,
+
+        status:
+          typeof articleInput.status ===
+          "string"
+            ? articleInput.status
+            : null,
+      },
+    );
+
+    const localWikiRepository =
+      await getLocalWikiRepository();
 
     const article =
       await localWikiRepository.createArticle(
-        body as ArticleEditorInput,
+        articleInput,
       );
+
+    console.log(
+      "[POST /api/local/articles] Artículo creado",
+      {
+        id: article.id,
+        slug: article.slug,
+        status: article.status,
+      },
+    );
 
     return jsonResponse(
       {
         data: article,
-        message: "El artículo fue creado correctamente.",
+        message:
+          "El artículo fue creado correctamente.",
       },
       201,
     );
   } catch (error) {
+    logApiError(
+      "POST /api/local/articles",
+      error,
+    );
+
     return apiErrorResponse(error);
   }
 };
