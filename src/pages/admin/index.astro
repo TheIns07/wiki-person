@@ -11,10 +11,6 @@ import type {
 
 export const prerender = false;
 
-/*
- * El listado es dinámico y no debe conservar
- * una versión anterior generada o almacenada.
- */
 Astro.response.headers.set(
   "Cache-Control",
   "private, no-store, max-age=0",
@@ -30,10 +26,7 @@ type ArticleRow = {
 
 type ArticleStatsRow = {
   article_id: string;
-  view_count:
-    | number
-    | string
-    | null;
+  view_count: number | string | null;
 };
 
 type AdminArticle = {
@@ -76,16 +69,6 @@ function normalizeStatus(
   return "draft";
 }
 
-function getErrorMessage(
-  error: unknown,
-): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Ocurrió un error desconocido.";
-}
-
 function formatUpdatedAt(
   value: string,
 ): string {
@@ -102,6 +85,14 @@ function formatUpdatedAt(
   return dateFormatter.format(date);
 }
 
+function getErrorMessage(
+  error: unknown,
+): string {
+  return error instanceof Error
+    ? error.message
+    : "Ocurrió un error desconocido.";
+}
+
 let articles: AdminArticle[] = [];
 let loadError = "";
 
@@ -112,9 +103,6 @@ try {
       cookies: Astro.cookies,
     });
 
-  /*
-   * Verificamos que la sesión siga vigente.
-   */
   const {
     data: {
       user,
@@ -132,10 +120,6 @@ try {
     );
   }
 
-  /*
-   * Verificamos que el usuario tenga
-   * permisos administrativos.
-   */
   const {
     data: profile,
     error: profileError,
@@ -159,10 +143,6 @@ try {
     );
   }
 
-  /*
-   * Obtenemos todos los artículos desde
-   * Supabase, incluyendo borradores y archivados.
-   */
   const {
     data: articleData,
     error: articleError,
@@ -193,10 +173,6 @@ try {
       articleData ?? []
     ) as ArticleRow[];
 
-  /*
-   * Las impresiones viven en una tabla
-   * separada: article_stats.
-   */
   const statsByArticleId =
     new Map<string, number>();
 
@@ -239,8 +215,7 @@ try {
       statsByArticleId.set(
         statsRow.article_id,
         Number(
-          statsRow.view_count ??
-          0,
+          statsRow.view_count ?? 0,
         ),
       );
     }
