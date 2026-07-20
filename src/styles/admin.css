@@ -1211,3 +1211,51 @@ html[data-theme="dark"]
       width: 100%;
     }
   }
+
+  .admin-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    gap: 24px;
+  }
+  
+  .admin-button {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 15px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  
+  .admin-button--primary {
+    border-color: var(--link);
+    background: var(--link);
+    color: #ffffff;
+  }
+  
+  .admin-button--primary:visited {
+    color: #ffffff;
+  }
+  
+  .admin-button--primary:hover {
+    background: var(--link-hover);
+    color: #ffffff;
+    text-decoration: none;
+  }
+  
+  @media (max-width: 700px) {
+    .admin-page-header {
+      display: block;
+    }
+  
+    .admin-page-header .admin-button {
+      width: 100%;
+      margin-top: 18px;
+    }
+  }

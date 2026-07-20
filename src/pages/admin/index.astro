@@ -1,10 +1,8 @@
 ---
-
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { localWikiRepository } from "../../lib/wiki/local-wiki-repository";
 
-const dashboard =
-  await localWikiRepository.getDashboardData();
+const dashboard = await localWikiRepository.getDashboardData();
 
 const numberFormatter = new Intl.NumberFormat("es-MX");
 
@@ -48,26 +46,23 @@ const statistics = [
   title="Resumen"
   description="Resumen administrativo de la enciclopedia."
 >
+  <a href="/admin/articulos/nuevo" class="admin-button admin-button--primary">
+    Nuevo artículo
+  </a>
+
   <header class="admin-page-header">
     <div>
       <h1>Resumen</h1>
 
-      <p>
-        Estado actual del contenido almacenado localmente.
-      </p>
+      <p>Estado actual del contenido almacenado localmente.</p>
     </div>
   </header>
 
-  <section
-    class="admin-stat-grid"
-    aria-label="Estadísticas generales"
-  >
+  <section class="admin-stat-grid" aria-label="Estadísticas generales">
     {
       statistics.map((statistic) => (
         <article class="admin-stat-card">
-          <p class="admin-stat-card__label">
-            {statistic.label}
-          </p>
+          <p class="admin-stat-card__label">{statistic.label}</p>
 
           <p class="admin-stat-card__value">
             {numberFormatter.format(statistic.value)}
@@ -85,9 +80,7 @@ const statistics = [
         {
           dashboard.popularArticles.map((article) => (
             <li>
-              <a href={`/wiki/${article.slug}`}>
-                {article.title}
-              </a>
+              <a href={`/wiki/${article.slug}`}>{article.title}</a>
 
               <span class="admin-list__metadata">
                 {numberFormatter.format(article.viewCount)}
@@ -104,19 +97,15 @@ const statistics = [
 
       <ul class="admin-list">
         {
-          dashboard.recentlyUpdatedArticles.map(
-            (article) => (
-              <li>
-                <span>{article.title}</span>
+          dashboard.recentlyUpdatedArticles.map((article) => (
+            <li>
+              <span>{article.title}</span>
 
-                <span class="admin-list__metadata">
-                  {dateFormatter.format(
-                    new Date(article.updatedAt),
-                  )}
-                </span>
-              </li>
-            ),
-          )
+              <span class="admin-list__metadata">
+                {dateFormatter.format(new Date(article.updatedAt))}
+              </span>
+            </li>
+          ))
         }
       </ul>
     </section>
