@@ -19,13 +19,12 @@ export async function getStaticPaths() {
   }));
 }
 
-const slug = Astro.params.slug;
+const slug = Astro.params.slug ?? "";
 
-const articlePageData = slug
-  ? await localWikiRepository.getPublishedArticleBySlug(
-      slug,
-    )
-  : null;
+const articlePageData =
+  await localWikiRepository.getPublishedArticleBySlug(
+    slug,
+  );
 
 if (!articlePageData) {
   Astro.response.status = 404;
@@ -33,4 +32,58 @@ if (!articlePageData) {
 
 const currentViewCount =
   articlePageData?.article.viewCount ?? 0;
+
+const editHref = articlePageData
+  ? `/admin/articulos/${articlePageData.article.id}`
+  : undefined;
+
+const historyHref = articlePageData
+  ? `/admin/articulos/${articlePageData.article.id}/historial`
+  : undefined;
 ---
+
+{
+  articlePageData ? (
+    <WikiLayout
+      title={articlePageData.article.title}
+      description={articlePageData.article.summary}
+      article
+      toc={articlePageData.article.toc}
+      editHref={editHref}
+      historyHref={historyHref}
+    >
+      <ArticleView
+        article={articlePageData.article}
+        categories={articlePageData.categories}
+        relatedArticles={
+          articlePageData.relatedArticles
+        }
+        viewCount={currentViewCount}
+      />
+    </WikiLayout>
+  ) : (
+    <WikiLayout
+      title="Artículo no encontrado"
+      description="El artículo solicitado no existe o no está publicado."
+    >
+      <section class="not-found-page">
+        <p class="not-found-page__code">
+          404
+        </p>
+
+        <h1>
+          Artículo no encontrado
+        </h1>
+
+        <p>
+          El artículo solicitado no existe, está
+          archivado o todavía no ha sido publicado.
+        </p>
+
+        <a href="/">
+          Regresar a la portada
+        </a>
+      </section>
+    </WikiLayout>
+  )
+}
