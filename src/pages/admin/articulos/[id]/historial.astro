@@ -1,5 +1,14 @@
 ---
-export const prerender = false;
+export async function getStaticPaths() {
+  const articles =
+    await localWikiRepository.listArticles();
+
+  return articles.map((article) => ({
+    params: {
+      id: String(article.id),
+    },
+  }));
+}
 
 import RevisionHistory from "../../../../components/admin/history/RevisionHistory";
 import AdminLayout from "../../../../layouts/AdminLayout.astro";

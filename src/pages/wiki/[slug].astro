@@ -1,12 +1,23 @@
 ---
-export const prerender = false;
-
 import ArticleView from "../../components/wiki/ArticleView.astro";
 import WikiLayout from "../../layouts/WikiLayout.astro";
 
 import {
   localWikiRepository,
 } from "../../lib/wiki/local-wiki-repository";
+
+export async function getStaticPaths() {
+  const publishedArticles =
+    await localWikiRepository.listArticles({
+      status: "published",
+    });
+
+  return publishedArticles.map((article) => ({
+    params: {
+      slug: article.slug,
+    },
+  }));
+}
 
 const slug = Astro.params.slug;
 
@@ -20,47 +31,6 @@ if (!articlePageData) {
   Astro.response.status = 404;
 }
 
-const currentViewCount = articlePageData
-  ? await localWikiRepository.incrementArticleView(
-      articlePageData.article.id,
-    )
-  : 0;
+const currentViewCount =
+  articlePageData?.article.viewCount ?? 0;
 ---
-
-{
-  articlePageData ? (
-    <WikiLayout
-      title={articlePageData.article.title}
-      description={articlePageData.article.summary}
-      article
-      toc={articlePageData.article.toc}
-    >
-      <ArticleView
-        article={articlePageData.article}
-        categories={articlePageData.categories}
-        relatedArticles={
-          articlePageData.relatedArticles
-        }
-        viewCount={currentViewCount}
-      />
-    </WikiLayout>
-  ) : (
-    <WikiLayout
-      title="Artículo no encontrado"
-      description="El artículo solicitado no existe."
-    >
-      <section class="not-found-page">
-        <p class="not-found-page__code">404</p>
-
-        <h1>Artículo no encontrado</h1>
-
-        <p>
-          El artículo solicitado no existe, está archivado
-          o todavía no ha sido publicado.
-        </p>
-
-        <a href="/">Regresar a la portada</a>
-      </section>
-    </WikiLayout>
-  )
-}
