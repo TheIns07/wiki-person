@@ -1,50 +1,708 @@
 ---
-export async function getStaticPaths() {
-  const articles =
-    await localWikiRepository.listArticles();
-
-  return articles.map((article) => ({
-    params: {
-      id: String(article.id),
-    },
-  }));
-}
-
 import ArticleEditorForm from "../../../../components/admin/forms/ArticleEditorForm";
 import AdminLayout from "../../../../layouts/AdminLayout.astro";
 
-import { localWikiRepository } from "../../../../lib/wiki/local-wiki-repository";
+import {
+  createSupabaseServerClient,
+} from "../../../../lib/supabase/server";
 
-const articleId = Astro.params.id;
+import type {
+  Article,
+  ArticleStatus,
+  QuickFacts,
+  TocItem,
+  TocLevel,
+} from "../../../../types/wiki";
 
-const [article, categories, articles] = articleId
-  ? await Promise.all([
-      localWikiRepository.getArticleById(articleId),
-      localWikiRepository.listCategories(),
-      localWikiRepository.listArticles(),
-    ])
-  : [null, [], []];
+export const prerender = false;
 
-if (!article) {
-  Astro.response.status = 404;
+/*
+ * Evita que Netlify o el navegador conserven
+ * respuestas 404 anteriores para esta ruta.
+ */
+Astro.response.headers.set(
+  "Cache-Control",
+  "private, no-store, max-age=0",
+);
+
+interface ArticleRow {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  slug: string;
+  summary: string;
+  status: string;
+  lead_html: string;
+  content_html: string;
+  quick_facts: unknown;
+  is_featured: boolean;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-const categoryOptions = categories.map((category) => ({
-  id: category.id,
-  name: category.name,
-}));
+interface CategoryRow {
+  id: string;
+  name: string;
+}
 
-const relatedArticleOptions = articles
-  .filter((candidate) => candidate.id !== article?.id)
-  .map((candidate) => ({
-    id: candidate.id,
-    title: candidate.title,
-    status: candidate.status,
-  }));
+interface ArticleOptionRow {
+  id: string;
+  title: string;
+  status: string;
+}
+
+interface CategoryLinkRow {
+  category_id: string;
+}
+
+interface AliasRow {
+  old_slug: string;
+}
+
+interface RelationRow {
+  target_article_id: string;
+}
+
+interface StatsRow {
+  view_count: number | string | null;
+}
+
+const defaultQuickFacts: QuickFacts = {
+  enabled: false,
+  title: "Datos rápidos",
+  summary: "",
+  defaultOpen: false,
+  sections: [],
+};
+
+function isRecord(
+  value: unknown,
+): value is Record<string, unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
+  );
+}
+
+function normalizeStatus(
+  value: unknown,
+): ArticleStatus {
+  if (
+    value === "published" ||
+    value === "archived"
+  ) {
+    return value;
+  }
+
+  return "draft";
+}
+
+function decodeBasicHtmlEntities(
+  value: string,
+): string {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+}
+
+function htmlToPlainText(
+  value: string,
+): string {
+  return decodeBasicHtmlEntities(
+    value
+      .replace(
+        /<script\b[^>]*>[\s\S]*?<\/script>/gi,
+        " ",
+      )
+      .replace(
+        /<style\b[^>]*>[\s\S]*?<\/style>/gi,
+        " ",
+      )
+      .replace(/<[^>]+>/g, " "),
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function createHeadingId(
+  label: string,
+  index: number,
+): string {
+  const normalized = label
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return normalized || `seccion-${index + 1}`;
+}
+
+function extractToc(
+  html: string,
+): TocItem[] {
+  const toc: TocItem[] = [];
+
+  const headingPattern =
+    /<h([2-4])\b([^>]*)>([\s\S]*?)<\/h\1>/gi;
+
+  let match:
+    | RegExpExecArray
+    | null;
+
+  while (
+    (
+      match =
+        headingPattern.exec(html)
+    ) !== null
+  ) {
+    const level =
+      Number(match[1]) as TocLevel;
+
+    const attributes =
+      match[2] ?? "";
+
+    const label =
+      htmlToPlainText(
+        match[3] ?? "",
+      );
+
+    if (!label) {
+      continue;
+    }
+
+    const idMatch =
+      attributes.match(
+        /\bid=["']([^"']+)["']/i,
+      );
+
+    toc.push({
+      id:
+        idMatch?.[1] ??
+        createHeadingId(
+          label,
+          toc.length,
+        ),
+
+      label,
+      level,
+    });
+  }
+
+  return toc;
+}
+
+function normalizeQuickFacts(
+  value: unknown,
+): QuickFacts {
+  if (!isRecord(value)) {
+    return defaultQuickFacts;
+  }
+
+  return {
+    enabled:
+      value.enabled === true,
+
+    title:
+      typeof value.title === "string" &&
+      value.title.trim()
+        ? value.title
+        : "Datos rápidos",
+
+    summary:
+      typeof value.summary === "string"
+        ? value.summary
+        : "",
+
+    defaultOpen:
+      value.defaultOpen === true,
+
+    sections:
+      Array.isArray(value.sections)
+        ? (
+            value.sections as QuickFacts["sections"]
+          )
+        : [],
+  };
+}
+
+function getErrorMessage(
+  error: unknown,
+): string {
+  if (
+    error instanceof Error
+  ) {
+    return error.message;
+  }
+
+  if (
+    isRecord(error) &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+
+  return "Ocurrió un error desconocido.";
+}
+
+const articleId =
+  Astro.params.id?.trim() ?? "";
+
+let article:
+  | Article
+  | null = null;
+
+let categoryOptions: Array<{
+  id: string;
+  name: string;
+}> = [];
+
+let relatedArticleOptions: Array<{
+  id: string;
+  title: string;
+  status: ArticleStatus;
+}> = [];
+
+let loadError = "";
+
+if (!articleId) {
+  Astro.response.status = 404;
+} else {
+  try {
+    const supabase =
+      createSupabaseServerClient({
+        request: Astro.request,
+        cookies: Astro.cookies,
+      });
+
+    /*
+     * Verificamos que exista una sesión
+     * válida de Supabase.
+     */
+    const {
+      data: {
+        user,
+      },
+      error: userError,
+    } =
+      await supabase.auth.getUser();
+
+    if (
+      userError ||
+      !user
+    ) {
+      return Astro.redirect(
+        "/admin/login?error=Tu%20sesión%20expiró.%20Inicia%20sesión%20nuevamente.",
+      );
+    }
+
+    /*
+     * Verificamos explícitamente que el
+     * usuario tenga role = admin.
+     */
+    const {
+      data: profile,
+      error: profileError,
+    } = await supabase
+      .from("profiles")
+      .select("id, role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      throw new Error(
+        `No fue posible verificar el perfil: ${profileError.message}`,
+      );
+    }
+
+    if (
+      profile?.role !== "admin"
+    ) {
+      return Astro.redirect(
+        "/admin/login?error=Tu%20cuenta%20no%20tiene%20permisos%20de%20administrador.",
+      );
+    }
+
+    /*
+     * Cargamos el artículo desde Supabase.
+     */
+    const {
+      data: articleData,
+      error: articleError,
+    } = await supabase
+      .from("articles")
+      .select(`
+        id,
+        title,
+        subtitle,
+        slug,
+        summary,
+        status,
+        lead_html,
+        content_html,
+        quick_facts,
+        is_featured,
+        published_at,
+        created_at,
+        updated_at
+      `)
+      .eq("id", articleId)
+      .maybeSingle();
+
+    if (articleError) {
+      throw new Error(
+        `No fue posible cargar el artículo: ${articleError.message}`,
+      );
+    }
+
+    if (!articleData) {
+      Astro.response.status = 404;
+    } else {
+      /*
+       * Obtenemos las relaciones editoriales
+       * que necesita ArticleEditorForm.
+       */
+      const [
+        categoriesResult,
+        articleOptionsResult,
+        categoryLinksResult,
+        aliasesResult,
+        relationsResult,
+        statsResult,
+      ] = await Promise.all([
+        supabase
+          .from("categories")
+          .select("id, name")
+          .order(
+            "sort_order",
+            {
+              ascending: true,
+            },
+          )
+          .order(
+            "name",
+            {
+              ascending: true,
+            },
+          ),
+
+        supabase
+          .from("articles")
+          .select(
+            "id, title, status",
+          )
+          .neq("id", articleId)
+          .order(
+            "title",
+            {
+              ascending: true,
+            },
+          ),
+
+        supabase
+          .from(
+            "article_categories",
+          )
+          .select("category_id")
+          .eq(
+            "article_id",
+            articleId,
+          ),
+
+        supabase
+          .from(
+            "article_redirects",
+          )
+          .select("old_slug")
+          .eq(
+            "article_id",
+            articleId,
+          )
+          .eq(
+            "reason",
+            "alias",
+          )
+          .eq(
+            "is_active",
+            true,
+          )
+          .order(
+            "created_at",
+            {
+              ascending: true,
+            },
+          ),
+
+        supabase
+          .from(
+            "article_relations",
+          )
+          .select(
+            "target_article_id",
+          )
+          .eq(
+            "source_article_id",
+            articleId,
+          )
+          .eq(
+            "relation_type",
+            "related",
+          )
+          .order(
+            "sort_order",
+            {
+              ascending: true,
+            },
+          ),
+
+        supabase
+          .from("article_stats")
+          .select("view_count")
+          .eq(
+            "article_id",
+            articleId,
+          )
+          .maybeSingle(),
+      ]);
+
+      if (
+        categoriesResult.error
+      ) {
+        throw new Error(
+          `No fue posible cargar las categorías: ${categoriesResult.error.message}`,
+        );
+      }
+
+      if (
+        articleOptionsResult.error
+      ) {
+        throw new Error(
+          `No fue posible cargar los artículos relacionados: ${articleOptionsResult.error.message}`,
+        );
+      }
+
+      if (
+        categoryLinksResult.error
+      ) {
+        throw new Error(
+          `No fue posible cargar las categorías del artículo: ${categoryLinksResult.error.message}`,
+        );
+      }
+
+      if (
+        aliasesResult.error
+      ) {
+        throw new Error(
+          `No fue posible cargar los alias: ${aliasesResult.error.message}`,
+        );
+      }
+
+      if (
+        relationsResult.error
+      ) {
+        throw new Error(
+          `No fue posible cargar las relaciones: ${relationsResult.error.message}`,
+        );
+      }
+
+      if (
+        statsResult.error
+      ) {
+        throw new Error(
+          `No fue posible cargar las estadísticas: ${statsResult.error.message}`,
+        );
+      }
+
+      const articleRow =
+        articleData as ArticleRow;
+
+      const categoryRows =
+        (
+          categoriesResult.data ??
+          []
+        ) as CategoryRow[];
+
+      const articleOptionRows =
+        (
+          articleOptionsResult.data ??
+          []
+        ) as ArticleOptionRow[];
+
+      const categoryLinkRows =
+        (
+          categoryLinksResult.data ??
+          []
+        ) as CategoryLinkRow[];
+
+      const aliasRows =
+        (
+          aliasesResult.data ??
+          []
+        ) as AliasRow[];
+
+      const relationRows =
+        (
+          relationsResult.data ??
+          []
+        ) as RelationRow[];
+
+      const statsRow =
+        statsResult.data as
+          | StatsRow
+          | null;
+
+      const leadHtml =
+        articleRow.lead_html ??
+        "";
+
+      const contentHtml =
+        articleRow.content_html ??
+        "";
+
+      categoryOptions =
+        categoryRows.map(
+          (category) => ({
+            id: category.id,
+            name: category.name,
+          }),
+        );
+
+      relatedArticleOptions =
+        articleOptionRows.map(
+          (
+            relatedArticle,
+          ) => ({
+            id:
+              relatedArticle.id,
+
+            title:
+              relatedArticle.title,
+
+            status:
+              normalizeStatus(
+                relatedArticle.status,
+              ),
+          }),
+        );
+
+      article = {
+        id:
+          articleRow.id,
+
+        title:
+          articleRow.title,
+
+        slug:
+          articleRow.slug,
+
+        subtitle:
+          articleRow.subtitle ??
+          "",
+
+        summary:
+          articleRow.summary ??
+          "",
+
+        leadHtml,
+        contentHtml,
+
+        /*
+         * La tabla actual no almacena todavía
+         * el JSON de Tiptap.
+         */
+        contentJson: null,
+
+        plainText:
+          htmlToPlainText(
+            `${leadHtml} ${contentHtml}`,
+          ),
+
+        status:
+          normalizeStatus(
+            articleRow.status,
+          ),
+
+        featured:
+          articleRow.is_featured ===
+          true,
+
+        toc:
+          extractToc(
+            contentHtml,
+          ),
+
+        quickFacts:
+          normalizeQuickFacts(
+            articleRow.quick_facts,
+          ),
+
+        categoryIds:
+          categoryLinkRows.map(
+            (link) =>
+              link.category_id,
+          ),
+
+        aliases:
+          aliasRows.map(
+            (alias) =>
+              alias.old_slug,
+          ),
+
+        relatedArticleIds:
+          relationRows.map(
+            (relation) =>
+              relation.target_article_id,
+          ),
+
+        viewCount:
+          Number(
+            statsRow?.view_count ??
+            0,
+          ),
+
+        createdAt:
+          articleRow.created_at,
+
+        updatedAt:
+          articleRow.updated_at,
+
+        publishedAt:
+          articleRow.published_at ??
+          null,
+      };
+    }
+  } catch (error) {
+    console.error(
+      `[GET /admin/articulos/${articleId}]`,
+      error,
+    );
+
+    loadError =
+      getErrorMessage(
+        error,
+      );
+
+    Astro.response.status = 500;
+  }
+}
 ---
 
 <AdminLayout
-  title={article?.title ?? "Artículo no encontrado"}
+  title={
+    article?.title ??
+    (
+      loadError
+        ? "Error al cargar artículo"
+        : "Artículo no encontrado"
+    )
+  }
   description="Edición de un artículo."
 >
   {
@@ -54,7 +712,11 @@ const relatedArticleOptions = articles
           <div>
             <h1>Editar artículo</h1>
 
-            <p>Modifica el contenido, organización y estado editorial.</p>
+            <p>
+              Modifica el contenido,
+              organización y estado
+              editorial.
+            </p>
           </div>
 
           <div class="admin-page-header__actions">
@@ -62,6 +724,7 @@ const relatedArticleOptions = articles
               href={`/admin/articulos/${article.id}/vista-previa`}
               class="admin-button admin-button--secondary"
               target="_blank"
+              rel="noreferrer"
             >
               Vista previa
             </a>
@@ -89,18 +752,42 @@ const relatedArticleOptions = articles
           categories={categoryOptions}
           relatedArticles={relatedArticleOptions}
         >
-          <p slot="fallback" class="admin-editor-loading">
+          <p
+            slot="fallback"
+            class="admin-editor-loading"
+          >
             Cargando editor…
           </p>
         </ArticleEditorForm>
       </>
+    ) : loadError ? (
+      <section class="admin-panel admin-not-found">
+        <h1>
+          No fue posible cargar el artículo
+        </h1>
+
+        <p>
+          {loadError}
+        </p>
+
+        <a href="/admin/articulos">
+          Regresar al listado
+        </a>
+      </section>
     ) : (
       <section class="admin-panel admin-not-found">
-        <h1>Artículo no encontrado</h1>
+        <h1>
+          Artículo no encontrado
+        </h1>
 
-        <p>El artículo solicitado no existe o ya fue eliminado.</p>
+        <p>
+          El artículo solicitado no existe
+          o ya fue eliminado.
+        </p>
 
-        <a href="/admin/articulos">Regresar al listado</a>
+        <a href="/admin/articulos">
+          Regresar al listado
+        </a>
       </section>
     )
   }
