@@ -1,13 +1,9 @@
 ---
-import AdminLayout from "../../../src/layouts/AdminLayout.astro";
+import AdminLayout from "../../layouts/AdminLayout.astro";
 
 import {
   createSupabaseServerClient,
-} from "../../../src/lib/supabase/server";
-
-import type {
-  ArticleStatus,
-} from "../../../src/types/wiki";
+} from "../../lib/supabase/server";
 
 export const prerender = false;
 
@@ -16,12 +12,18 @@ Astro.response.headers.set(
   "private, no-store, max-age=0",
 );
 
+type ArticleStatus =
+  | "draft"
+  | "published"
+  | "archived";
+
 type ArticleRow = {
   id: string;
   title: string;
   slug: string;
   status: string;
   updated_at: string;
+  published_at: string | null;
 };
 
 type ArticleStatsRow = {
@@ -29,12 +31,13 @@ type ArticleStatsRow = {
   view_count: number | string | null;
 };
 
-type AdminArticle = {
+type DashboardArticle = {
   id: string;
   title: string;
   slug: string;
   status: ArticleStatus;
   updatedAt: string;
+  publishedAt: string | null;
   viewCount: number;
 };
 
@@ -42,12 +45,9 @@ const numberFormatter =
   new Intl.NumberFormat("es-MX");
 
 const dateFormatter =
-  new Intl.DateTimeFormat(
-    "es-MX",
-    {
-      dateStyle: "medium",
-    },
-  );
+  new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+  });
 
 const statusLabels:
   Record<ArticleStatus, string> = {
@@ -69,7 +69,7 @@ function normalizeStatus(
   return "draft";
 }
 
-function formatUpdatedAt(
+function formatDate(
   value: string,
 ): string {
   const date = new Date(value);
@@ -93,7 +93,17 @@ function getErrorMessage(
     : "Ocurrió un error desconocido.";
 }
 
-let articles: AdminArticle[] = [];
+let articles: DashboardArticle[] = [];
+let recentArticles: DashboardArticle[] = [];
+let popularArticles: DashboardArticle[] = [];
+
+let totalArticles = 0;
+let publishedArticles = 0;
+let draftArticles = 0;
+let archivedArticles = 0;
+let totalViews = 0;
+
+let administratorEmail = "";
 let loadError = "";
 
 try {
@@ -103,13 +113,15 @@ try {
       cookies: Astro.cookies,
     });
 
+  /*
+   * Verifica la sesión actual.
+   */
   const {
     data: {
       user,
     },
     error: userError,
-  } =
-    await supabase.auth.getUser();
+  } = await supabase.auth.getUser();
 
   if (
     userError ||
@@ -120,6 +132,12 @@ try {
     );
   }
 
+  administratorEmail =
+    user.email ?? "";
+
+  /*
+   * Verifica que el usuario sea administrador.
+   */
   const {
     data: profile,
     error: profileError,
@@ -143,6 +161,9 @@ try {
     );
   }
 
+  /*
+   * Carga todos los artículos administrativos.
+   */
   const {
     data: articleData,
     error: articleError,
@@ -153,14 +174,12 @@ try {
       title,
       slug,
       status,
-      updated_at
+      updated_at,
+      published_at
     `)
-    .order(
-      "updated_at",
-      {
-        ascending: false,
-      },
-    );
+    .order("updated_at", {
+      ascending: false,
+    });
 
   if (articleError) {
     throw new Error(
@@ -169,20 +188,15 @@ try {
   }
 
   const articleRows =
-    (
-      articleData ?? []
-    ) as ArticleRow[];
+    (articleData ?? []) as ArticleRow[];
 
   const statsByArticleId =
     new Map<string, number>();
 
-  if (
-    articleRows.length > 0
-  ) {
+  if (articleRows.length > 0) {
     const articleIds =
       articleRows.map(
-        (article) =>
-          article.id,
+        (article) => article.id,
       );
 
     const {
@@ -198,34 +212,37 @@ try {
         articleIds,
       );
 
+    /*
+     * Las estadísticas son secundarias:
+     * si fallan, el panel sigue funcionando.
+     */
     if (statsError) {
-      throw new Error(
-        `No fue posible cargar las impresiones: ${statsError.message}`,
+      console.warn(
+        "[GET /admin] No fue posible cargar las impresiones:",
+        statsError,
       );
-    }
+    } else {
+      const statsRows =
+        (statsData ??
+          []) as ArticleStatsRow[];
 
-    const statsRows =
-      (
-        statsData ?? []
-      ) as ArticleStatsRow[];
-
-    for (
-      const statsRow of statsRows
-    ) {
-      statsByArticleId.set(
-        statsRow.article_id,
-        Number(
-          statsRow.view_count ?? 0,
-        ),
-      );
+      for (
+        const statsRow of statsRows
+      ) {
+        statsByArticleId.set(
+          statsRow.article_id,
+          Number(
+            statsRow.view_count ?? 0,
+          ),
+        );
+      }
     }
   }
 
   articles =
     articleRows.map(
       (articleRow) => ({
-        id:
-          articleRow.id,
+        id: articleRow.id,
 
         title:
           articleRow.title,
@@ -241,15 +258,69 @@ try {
         updatedAt:
           articleRow.updated_at,
 
+        publishedAt:
+          articleRow.published_at,
+
         viewCount:
           statsByArticleId.get(
             articleRow.id,
           ) ?? 0,
       }),
     );
+
+  totalArticles =
+    articles.length;
+
+  publishedArticles =
+    articles.filter(
+      (article) =>
+        article.status === "published",
+    ).length;
+
+  draftArticles =
+    articles.filter(
+      (article) =>
+        article.status === "draft",
+    ).length;
+
+  archivedArticles =
+    articles.filter(
+      (article) =>
+        article.status === "archived",
+    ).length;
+
+  totalViews =
+    articles.reduce(
+      (
+        accumulatedViews,
+        article,
+      ) =>
+        accumulatedViews +
+        article.viewCount,
+      0,
+    );
+
+  recentArticles =
+    articles.slice(0, 5);
+
+  popularArticles =
+    articles
+      .filter(
+        (article) =>
+          article.status === "published",
+      )
+      .sort(
+        (
+          firstArticle,
+          secondArticle,
+        ) =>
+          secondArticle.viewCount -
+          firstArticle.viewCount,
+      )
+      .slice(0, 5);
 } catch (error) {
   console.error(
-    "[GET /admin/articulos]",
+    "[GET /admin]",
     error,
   );
 
@@ -261,27 +332,44 @@ try {
 ---
 
 <AdminLayout
-  title="Artículos"
-  description="Listado administrativo de artículos."
+  title="Panel administrativo"
+  description="Resumen administrativo de Asterion Lexicon."
 >
-  <header class="admin-page-header">
+  <header class="dashboard-header">
     <div>
-      <h1>Artículos</h1>
+      <p class="dashboard-header__eyebrow">
+        Administración
+      </p>
+
+      <h1>
+        Panel de control
+      </h1>
 
       <p>
-        {
-          loadError
-            ? "No fue posible cargar el listado."
-            : `${articles.length}${
-                articles.length === 1
-                  ? " artículo registrado"
-                  : " artículos registrados"
-              }`
-        }
+        Gestiona los artículos y revisa
+        la actividad general del archivo.
       </p>
+
+      {
+        administratorEmail && (
+          <small>
+            Sesión iniciada como{" "}
+            <strong>
+              {administratorEmail}
+            </strong>
+          </small>
+        )
+      }
     </div>
 
-    <div class="admin-page-header__actions">
+    <div class="dashboard-header__actions">
+      <a
+        href="/admin/articulos"
+        class="admin-button admin-button--secondary"
+      >
+        Ver artículos
+      </a>
+
       <a
         href="/admin/articulos/nuevo"
         class="admin-button admin-button--primary"
@@ -293,122 +381,648 @@ try {
 
   {
     loadError ? (
-      <section class="admin-panel">
+      <section class="admin-panel dashboard-error">
         <h2>
-          Error al cargar los artículos
+          No fue posible cargar el panel
         </h2>
 
         <p>
           {loadError}
         </p>
 
-        <p>
-          <a href="/admin/articulos">
-            Volver a intentar
-          </a>
-        </p>
+        <a href="/admin">
+          Volver a intentar
+        </a>
       </section>
     ) : (
-      <section class="admin-panel">
-        <div class="admin-table-wrapper">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>Artículo</th>
-                <th>Estado</th>
-                <th>Impresiones</th>
-                <th>Actualización</th>
-                <th>Vista pública</th>
-              </tr>
-            </thead>
+      <>
+        <section
+          class="dashboard-stats"
+          aria-label="Resumen del archivo"
+        >
+          <article class="dashboard-stat">
+            <span>
+              Total
+            </span>
 
-            <tbody>
+            <strong>
               {
-                articles.length > 0 ? (
-                  articles.map(
-                    (article) => (
-                      <tr>
-                        <td>
-                          <a
-                            class="admin-table__title"
-                            href={`/admin/articulos/${article.id}`}
-                          >
-                            {article.title}
-                          </a>
-
-                          <br />
-
-                          <small>
-                            /wiki/{article.slug}
-                          </small>
-                        </td>
-
-                        <td>
-                          <span
-                            class={`status-badge status-badge--${article.status}`}
-                          >
-                            {
-                              statusLabels[
-                                article.status
-                              ]
-                            }
-                          </span>
-                        </td>
-
-                        <td>
-                          {
-                            numberFormatter.format(
-                              article.viewCount,
-                            )
-                          }
-                        </td>
-
-                        <td>
-                          {
-                            formatUpdatedAt(
-                              article.updatedAt,
-                            )
-                          }
-                        </td>
-
-                        <td>
-                          {
-                            article.status ===
-                            "published" ? (
-                              <a
-                                href={`/wiki/${article.slug}`}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                Abrir
-                              </a>
-                            ) : (
-                              <span>—</span>
-                            )
-                          }
-                        </td>
-                      </tr>
-                    ),
-                  )
-                ) : (
-                  <tr>
-                    <td colspan="5">
-                      <p>
-                        Todavía no hay artículos
-                        registrados en Supabase.
-                      </p>
-
-                      <a href="/admin/articulos/nuevo">
-                        Crear el primer artículo
-                      </a>
-                    </td>
-                  </tr>
+                numberFormatter.format(
+                  totalArticles,
                 )
               }
-            </tbody>
-          </table>
+            </strong>
+
+            <p>
+              Artículos registrados
+            </p>
+          </article>
+
+          <article class="dashboard-stat">
+            <span>
+              Publicados
+            </span>
+
+            <strong>
+              {
+                numberFormatter.format(
+                  publishedArticles,
+                )
+              }
+            </strong>
+
+            <p>
+              Visibles públicamente
+            </p>
+          </article>
+
+          <article class="dashboard-stat">
+            <span>
+              Borradores
+            </span>
+
+            <strong>
+              {
+                numberFormatter.format(
+                  draftArticles,
+                )
+              }
+            </strong>
+
+            <p>
+              Pendientes de publicación
+            </p>
+          </article>
+
+          <article class="dashboard-stat">
+            <span>
+              Archivados
+            </span>
+
+            <strong>
+              {
+                numberFormatter.format(
+                  archivedArticles,
+                )
+              }
+            </strong>
+
+            <p>
+              Fuera de publicación
+            </p>
+          </article>
+
+          <article class="dashboard-stat">
+            <span>
+              Impresiones
+            </span>
+
+            <strong>
+              {
+                numberFormatter.format(
+                  totalViews,
+                )
+              }
+            </strong>
+
+            <p>
+              Consultas acumuladas
+            </p>
+          </article>
+        </section>
+
+        <div class="dashboard-grid">
+          <section class="admin-panel dashboard-panel">
+            <header class="dashboard-panel__header">
+              <div>
+                <p class="dashboard-panel__eyebrow">
+                  Actividad
+                </p>
+
+                <h2>
+                  Artículos recientes
+                </h2>
+              </div>
+
+              <a href="/admin/articulos">
+                Ver todos
+              </a>
+            </header>
+
+            {
+              recentArticles.length > 0 ? (
+                <ol class="dashboard-list">
+                  {
+                    recentArticles.map(
+                      (article) => (
+                        <li>
+                          <div>
+                            <a
+                              href={`/admin/articulos/${article.id}`}
+                            >
+                              {
+                                article.title
+                              }
+                            </a>
+
+                            <small>
+                              /wiki/
+                              {
+                                article.slug
+                              }
+                            </small>
+                          </div>
+
+                          <div class="dashboard-list__metadata">
+                            <span
+                              class={`status-badge status-badge--${article.status}`}
+                            >
+                              {
+                                statusLabels[
+                                  article.status
+                                ]
+                              }
+                            </span>
+
+                            <time
+                              datetime={
+                                article.updatedAt
+                              }
+                            >
+                              {
+                                formatDate(
+                                  article.updatedAt,
+                                )
+                              }
+                            </time>
+                          </div>
+                        </li>
+                      ),
+                    )
+                  }
+                </ol>
+              ) : (
+                <div class="dashboard-empty">
+                  <p>
+                    Todavía no hay artículos.
+                  </p>
+
+                  <a href="/admin/articulos/nuevo">
+                    Crear el primero
+                  </a>
+                </div>
+              )
+            }
+          </section>
+
+          <section class="admin-panel dashboard-panel">
+            <header class="dashboard-panel__header">
+              <div>
+                <p class="dashboard-panel__eyebrow">
+                  Rendimiento
+                </p>
+
+                <h2>
+                  Más consultados
+                </h2>
+              </div>
+            </header>
+
+            {
+              popularArticles.length > 0 ? (
+                <ol class="dashboard-ranking">
+                  {
+                    popularArticles.map(
+                      (
+                        article,
+                        index,
+                      ) => (
+                        <li>
+                          <span class="dashboard-ranking__position">
+                            {
+                              index + 1
+                            }
+                          </span>
+
+                          <div>
+                            <a
+                              href={`/wiki/${article.slug}`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {
+                                article.title
+                              }
+                            </a>
+
+                            <small>
+                              {
+                                numberFormatter.format(
+                                  article.viewCount,
+                                )
+                              }{" "}
+                              {
+                                article.viewCount ===
+                                1
+                                  ? "impresión"
+                                  : "impresiones"
+                              }
+                            </small>
+                          </div>
+                        </li>
+                      ),
+                    )
+                  }
+                </ol>
+              ) : (
+                <div class="dashboard-empty">
+                  <p>
+                    Todavía no hay artículos
+                    publicados con impresiones.
+                  </p>
+                </div>
+              )
+            }
+          </section>
+
+          <section class="admin-panel dashboard-panel dashboard-panel--wide">
+            <header class="dashboard-panel__header">
+              <div>
+                <p class="dashboard-panel__eyebrow">
+                  Accesos
+                </p>
+
+                <h2>
+                  Acciones rápidas
+                </h2>
+              </div>
+            </header>
+
+            <div class="dashboard-actions">
+              <a href="/admin/articulos/nuevo">
+                <strong>
+                  Crear artículo
+                </strong>
+
+                <span>
+                  Inicia una nueva entrada
+                  en el archivo.
+                </span>
+              </a>
+
+              <a href="/admin/articulos">
+                <strong>
+                  Administrar artículos
+                </strong>
+
+                <span>
+                  Edita, publica o archiva
+                  contenido existente.
+                </span>
+              </a>
+
+              <a
+                href="/buscar"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <strong>
+                  Probar búsqueda
+                </strong>
+
+                <span>
+                  Revisa el índice público
+                  de artículos.
+                </span>
+              </a>
+
+              <a
+                href="/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <strong>
+                  Abrir portada
+                </strong>
+
+                <span>
+                  Visualiza la experiencia
+                  pública del archivo.
+                </span>
+              </a>
+            </div>
+          </section>
         </div>
-      </section>
+      </>
     )
   }
 </AdminLayout>
+
+<style>
+  .dashboard-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 28px;
+    margin-bottom: 28px;
+  }
+
+  .dashboard-header__eyebrow,
+  .dashboard-panel__eyebrow {
+    margin: 0 0 5px;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .dashboard-header h1 {
+    margin: 0;
+  }
+
+  .dashboard-header p:not(
+    .dashboard-header__eyebrow
+  ) {
+    margin: 8px 0 4px;
+    color: var(--text-muted);
+  }
+
+  .dashboard-header small {
+    color: var(--text-subtle);
+  }
+
+  .dashboard-header__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .dashboard-stats {
+    display: grid;
+    grid-template-columns:
+      repeat(
+        5,
+        minmax(0, 1fr)
+      );
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .dashboard-stat {
+    min-width: 0;
+    padding: 20px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-medium, 8px);
+    background: var(--surface);
+  }
+
+  .dashboard-stat span {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .dashboard-stat strong {
+    display: block;
+    margin-top: 8px;
+    color: var(--text-heading);
+    font-family: var(--font-serif);
+    font-size: clamp(
+      1.8rem,
+      4vw,
+      2.4rem
+    );
+    font-weight: 400;
+    line-height: 1;
+  }
+
+  .dashboard-stat p {
+    margin: 9px 0 0;
+    color: var(--text-subtle);
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns:
+      minmax(0, 1.4fr)
+      minmax(280px, 0.8fr);
+    gap: 20px;
+  }
+
+  .dashboard-panel {
+    min-width: 0;
+  }
+
+  .dashboard-panel--wide {
+    grid-column: 1 / -1;
+  }
+
+  .dashboard-panel__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+
+  .dashboard-panel__header h2 {
+    margin: 0;
+  }
+
+  .dashboard-list,
+  .dashboard-ranking {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .dashboard-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 14px 0;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .dashboard-list li:first-child {
+    border-top: 0;
+  }
+
+  .dashboard-list li > div:first-child {
+    min-width: 0;
+  }
+
+  .dashboard-list a,
+  .dashboard-ranking a {
+    font-weight: 700;
+  }
+
+  .dashboard-list small,
+  .dashboard-ranking small {
+    display: block;
+    margin-top: 3px;
+    color: var(--text-subtle);
+  }
+
+  .dashboard-list__metadata {
+    display: grid;
+    justify-items: end;
+    gap: 5px;
+    flex: 0 0 auto;
+  }
+
+  .dashboard-list__metadata time {
+    color: var(--text-subtle);
+    font-size: 0.75rem;
+  }
+
+  .dashboard-ranking {
+    counter-reset: ranking;
+  }
+
+  .dashboard-ranking li {
+    display: grid;
+    grid-template-columns:
+      34px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 13px 0;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .dashboard-ranking li:first-child {
+    border-top: 0;
+  }
+
+  .dashboard-ranking__position {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border-soft);
+    border-radius: 50%;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+    place-items: center;
+  }
+
+  .dashboard-actions {
+    display: grid;
+    grid-template-columns:
+      repeat(
+        4,
+        minmax(0, 1fr)
+      );
+    gap: 12px;
+  }
+
+  .dashboard-actions a {
+    display: grid;
+    gap: 6px;
+    min-height: 112px;
+    padding: 18px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-small);
+    color: inherit;
+    background: var(--background);
+    text-decoration: none;
+  }
+
+  .dashboard-actions a:hover {
+    border-color: var(--focus);
+    background: var(--surface-hover);
+  }
+
+  .dashboard-actions strong {
+    color: var(--link);
+  }
+
+  .dashboard-actions span {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .dashboard-empty {
+    padding: 26px 0;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  .dashboard-empty p {
+    margin: 0 0 8px;
+  }
+
+  .dashboard-error {
+    max-width: 760px;
+  }
+
+  @media (
+    max-width: 1050px
+  ) {
+    .dashboard-stats {
+      grid-template-columns:
+        repeat(
+          3,
+          minmax(0, 1fr)
+        );
+    }
+
+    .dashboard-actions {
+      grid-template-columns:
+        repeat(
+          2,
+          minmax(0, 1fr)
+        );
+    }
+  }
+
+  @media (
+    max-width: 760px
+  ) {
+    .dashboard-header {
+      flex-direction: column;
+    }
+
+    .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .dashboard-panel--wide {
+      grid-column: auto;
+    }
+
+    .dashboard-stats {
+      grid-template-columns:
+        repeat(
+          2,
+          minmax(0, 1fr)
+        );
+    }
+
+    .dashboard-list li {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .dashboard-list__metadata {
+      justify-items: start;
+    }
+  }
+
+  @media (
+    max-width: 500px
+  ) {
+    .dashboard-stats,
+    .dashboard-actions {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

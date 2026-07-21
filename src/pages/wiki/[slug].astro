@@ -3,85 +3,508 @@ import ArticleView from "../../components/wiki/ArticleView.astro";
 import WikiLayout from "../../layouts/WikiLayout.astro";
 
 import {
-  localWikiRepository,
-} from "../../lib/wiki/local-wiki-repository";
+  createSupabaseServerClient,
+} from "../../lib/supabase/server";
 
-export async function getStaticPaths() {
-  const publishedArticles =
-    await localWikiRepository.listArticles({
-      status: "published",
+export const prerender = false;
+
+Astro.response.headers.set(
+  "Cache-Control",
+  "no-store",
+);
+
+const defaultQuickFacts = {
+  enabled: false,
+  title: "Datos rápidos",
+  summary: "",
+  defaultOpen: false,
+  sections: [],
+};
+
+function normalizeSlug(
+  value: string,
+): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function htmlToPlainText(
+  value: string,
+): string {
+  return value
+    .replace(
+      /<script\b[^>]*>[\s\S]*?<\/script>/gi,
+      " ",
+    )
+    .replace(
+      /<style\b[^>]*>[\s\S]*?<\/style>/gi,
+      " ",
+    )
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractToc(
+  html: string,
+) {
+  const toc: Array<{
+    id: string;
+    label: string;
+    level: 2 | 3 | 4;
+  }> = [];
+
+  const headingPattern =
+    /<h([2-4])\b([^>]*)>([\s\S]*?)<\/h\1>/gi;
+
+  let match:
+    | RegExpExecArray
+    | null;
+
+  while (
+    (
+      match =
+        headingPattern.exec(html)
+    ) !== null
+  ) {
+    const level =
+      Number(match[1]) as
+        | 2
+        | 3
+        | 4;
+
+    const attributes =
+      match[2] ?? "";
+
+    const label =
+      htmlToPlainText(
+        match[3] ?? "",
+      );
+
+    if (!label) {
+      continue;
+    }
+
+    const idMatch =
+      attributes.match(
+        /\bid=["']([^"']+)["']/i,
+      );
+
+    toc.push({
+      id:
+        idMatch?.[1] ??
+        normalizeSlug(label) ??
+        `seccion-${toc.length + 1}`,
+
+      label,
+      level,
     });
+  }
 
-  return publishedArticles.map((article) => ({
-    params: {
-      slug: article.slug,
-    },
-  }));
+  return toc;
 }
 
-const slug = Astro.params.slug ?? "";
+const slug =
+  Astro.params.slug?.trim() ?? "";
 
-const articlePageData =
-  await localWikiRepository.getPublishedArticleBySlug(
-    slug,
-  );
+let article: any = null;
+let categories: any[] = [];
+let relatedArticles: any[] = [];
+let viewCount = 0;
+let loadError = "";
 
-if (!articlePageData) {
+if (!slug) {
   Astro.response.status = 404;
+} else {
+  try {
+    const supabase =
+      createSupabaseServerClient({
+        request: Astro.request,
+        cookies: Astro.cookies,
+      });
+
+    /*
+     * Solo los artículos publicados tienen
+     * una página pública.
+     */
+    const {
+      data: articleRow,
+      error: articleError,
+    } = await supabase
+      .from("articles")
+      .select(`
+        id,
+        title,
+        subtitle,
+        slug,
+        summary,
+        status,
+        language_code,
+        lead_html,
+        content_html,
+        quick_facts,
+        is_featured,
+        featured_order,
+        published_at,
+        archived_at,
+        created_at,
+        updated_at
+      `)
+      .eq("slug", slug)
+      .eq("status", "published")
+      .maybeSingle();
+
+    if (articleError) {
+      throw new Error(
+        `No fue posible cargar el artículo: ${articleError.message}`,
+      );
+    }
+
+    if (!articleRow) {
+      Astro.response.status = 404;
+    } else {
+      const [
+        categoryLinksResult,
+        relationLinksResult,
+        aliasesResult,
+        statsResult,
+      ] = await Promise.all([
+        supabase
+          .from("article_categories")
+          .select("category_id")
+          .eq(
+            "article_id",
+            articleRow.id,
+          ),
+
+        supabase
+          .from("article_relations")
+          .select("target_article_id")
+          .eq(
+            "source_article_id",
+            articleRow.id,
+          )
+          .eq(
+            "relation_type",
+            "related",
+          )
+          .order(
+            "sort_order",
+            {
+              ascending: true,
+            },
+          ),
+
+        supabase
+          .from("article_redirects")
+          .select("old_slug")
+          .eq(
+            "article_id",
+            articleRow.id,
+          )
+          .eq(
+            "reason",
+            "alias",
+          )
+          .eq(
+            "is_active",
+            true,
+          ),
+
+        supabase
+          .from("article_stats")
+          .select("view_count")
+          .eq(
+            "article_id",
+            articleRow.id,
+          )
+          .maybeSingle(),
+      ]);
+
+      const categoryIds =
+        (
+          categoryLinksResult.data ??
+          []
+        ).map(
+          (item) =>
+            item.category_id,
+        );
+
+      const relatedArticleIds =
+        (
+          relationLinksResult.data ??
+          []
+        ).map(
+          (item) =>
+            item.target_article_id,
+        );
+
+      const aliases =
+        (
+          aliasesResult.data ??
+          []
+        ).map(
+          (item) =>
+            item.old_slug,
+        );
+
+      /*
+       * Consulta la información de categorías.
+       */
+      if (categoryIds.length > 0) {
+        const {
+          data: categoryRows,
+          error: categoryError,
+        } = await supabase
+          .from("categories")
+          .select(
+            "id, name, slug",
+          )
+          .in(
+            "id",
+            categoryIds,
+          )
+          .order(
+            "name",
+            {
+              ascending: true,
+            },
+          );
+
+        if (categoryError) {
+          console.warn(
+            "[wiki/[slug]] No fue posible cargar categorías:",
+            categoryError,
+          );
+        } else {
+          categories =
+            categoryRows ?? [];
+        }
+      }
+
+      /*
+       * Consulta los artículos relacionados.
+       */
+      if (
+        relatedArticleIds.length > 0
+      ) {
+        const {
+          data: relatedRows,
+          error: relatedError,
+        } = await supabase
+          .from("articles")
+          .select(`
+            id,
+            title,
+            slug,
+            summary,
+            status
+          `)
+          .in(
+            "id",
+            relatedArticleIds,
+          )
+          .eq(
+            "status",
+            "published",
+          );
+
+        if (relatedError) {
+          console.warn(
+            "[wiki/[slug]] No fue posible cargar relacionados:",
+            relatedError,
+          );
+        } else {
+          relatedArticles =
+            (
+              relatedRows ?? []
+            ).map(
+              (relatedRow) => ({
+                id:
+                  relatedRow.id,
+
+                title:
+                  relatedRow.title,
+
+                slug:
+                  relatedRow.slug,
+
+                summary:
+                  relatedRow.summary ??
+                  "",
+
+                status:
+                  relatedRow.status,
+              }),
+            );
+        }
+      }
+
+      viewCount =
+        Number(
+          statsResult.data
+            ?.view_count ?? 0,
+        );
+
+      const leadHtml =
+        articleRow.lead_html ?? "";
+
+      const contentHtml =
+        articleRow.content_html ??
+        "";
+
+      article = {
+        id:
+          articleRow.id,
+
+        title:
+          articleRow.title,
+
+        subtitle:
+          articleRow.subtitle ?? "",
+
+        slug:
+          articleRow.slug,
+
+        summary:
+          articleRow.summary ?? "",
+
+        status:
+          articleRow.status,
+
+        languageCode:
+          articleRow.language_code ??
+          "es",
+
+        leadHtml,
+        contentHtml,
+
+        contentJson:
+          null,
+
+        plainText:
+          htmlToPlainText(
+            `${leadHtml} ${contentHtml}`,
+          ),
+
+        toc:
+          extractToc(
+            contentHtml,
+          ),
+
+        quickFacts:
+          articleRow.quick_facts ??
+          defaultQuickFacts,
+
+        featured:
+          articleRow.is_featured ===
+          true,
+
+        featuredOrder:
+          articleRow.featured_order ??
+          null,
+
+        aliases,
+        categoryIds,
+        relatedArticleIds,
+
+        viewCount,
+
+        publishedAt:
+          articleRow.published_at ??
+          null,
+
+        archivedAt:
+          articleRow.archived_at ??
+          null,
+
+        createdAt:
+          articleRow.created_at,
+
+        updatedAt:
+          articleRow.updated_at,
+      };
+    }
+  } catch (error) {
+    console.error(
+      `[GET /wiki/${slug}]`,
+      error,
+    );
+
+    loadError =
+      error instanceof Error
+        ? error.message
+        : "Ocurrió un error inesperado.";
+
+    Astro.response.status = 500;
+  }
 }
-
-const currentViewCount =
-  articlePageData?.article.viewCount ?? 0;
-
-const editHref = articlePageData
-  ? `/admin/articulos/${articlePageData.article.id}`
-  : undefined;
-
-const historyHref = articlePageData
-  ? `/admin/articulos/${articlePageData.article.id}/historial`
-  : undefined;
 ---
 
 {
-  articlePageData ? (
+  article ? (
     <WikiLayout
-      title={articlePageData.article.title}
-      description={articlePageData.article.summary}
+      title={article.title}
+      description={article.summary}
       article
-      toc={articlePageData.article.toc}
-      editHref={editHref}
-      historyHref={historyHref}
+      toc={article.toc}
+      editHref={`/admin/articulos/${article.id}`}
+      historyHref={`/admin/articulos/${article.id}/historial`}
     >
       <ArticleView
-        article={articlePageData.article}
-        categories={articlePageData.categories}
-        relatedArticles={
-          articlePageData.relatedArticles
-        }
-        viewCount={currentViewCount}
+        article={article}
+        categories={categories}
+        relatedArticles={relatedArticles}
+        viewCount={viewCount}
       />
+    </WikiLayout>
+  ) : loadError ? (
+    <WikiLayout
+      title="Error al cargar el artículo"
+      description="No fue posible cargar el contenido solicitado."
+    >
+      <section class="wiki-message">
+        <h1>
+          No fue posible cargar el artículo
+        </h1>
+
+        <p>
+          {loadError}
+        </p>
+
+        <a href="/">
+          Volver a la portada
+        </a>
+      </section>
     </WikiLayout>
   ) : (
     <WikiLayout
       title="Artículo no encontrado"
       description="El artículo solicitado no existe o no está publicado."
     >
-      <section class="not-found-page">
-        <p class="not-found-page__code">
-          404
-        </p>
-
+      <section class="wiki-message">
         <h1>
           Artículo no encontrado
         </h1>
 
         <p>
-          El artículo solicitado no existe, está
-          archivado o todavía no ha sido publicado.
+          El artículo solicitado no existe,
+          está en borrador o fue archivado.
         </p>
 
         <a href="/">
-          Regresar a la portada
+          Volver a la portada
         </a>
       </section>
     </WikiLayout>

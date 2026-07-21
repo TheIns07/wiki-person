@@ -1,51 +1,643 @@
 ---
-export async function getStaticPaths() {
-  const articles =
-    await localWikiRepository.listArticles();
-
-  return articles.map((article) => ({
-    params: {
-      id: String(article.id),
-    },
-  }));
-}
-
 import ArticleView from "../../../../components/wiki/ArticleView.astro";
 import WikiLayout from "../../../../layouts/WikiLayout.astro";
 
 import {
-  localWikiRepository,
-} from "../../../../lib/wiki/local-wiki-repository";
+  createSupabaseServerClient,
+} from "../../../../lib/supabase/server";
 
-const articleId = Astro.params.id;
+export const prerender = false;
 
-const [article, categories, articles] = articleId
-  ? await Promise.all([
-      localWikiRepository.getArticleById(articleId),
-      localWikiRepository.listCategories(),
-      localWikiRepository.listArticles(),
-    ])
-  : [null, [], []];
+Astro.response.headers.set(
+  "Cache-Control",
+  "private, no-store, max-age=0",
+);
 
-if (!article) {
-  Astro.response.status = 404;
+const defaultQuickFacts = {
+  enabled: false,
+  title: "Datos rápidos",
+  summary: "",
+  defaultOpen: false,
+  sections: [],
+};
+
+function mutableRedirect(
+  location: string,
+): Response {
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: location,
+      "Cache-Control": "private, no-store",
+    },
+  });
 }
 
-const articleCategories = article
-  ? categories.filter((category) =>
-      article.categoryIds.includes(category.id),
-    )
-  : [];
+function normalizeSlug(
+  value: string,
+): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
-const relatedArticles = article
-  ? articles.filter(
-      (candidate) =>
-        candidate.status === "published" &&
-        article.relatedArticleIds.includes(
-          candidate.id,
-        ),
+function htmlToPlainText(
+  value: string,
+): string {
+  return value
+    .replace(
+      /<script\b[^>]*>[\s\S]*?<\/script>/gi,
+      " ",
     )
-  : [];
+    .replace(
+      /<style\b[^>]*>[\s\S]*?<\/style>/gi,
+      " ",
+    )
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractToc(
+  html: string,
+) {
+  const toc: Array<{
+    id: string;
+    label: string;
+    level: 2 | 3 | 4;
+  }> = [];
+
+  const headingPattern =
+    /<h([2-4])\b([^>]*)>([\s\S]*?)<\/h\1>/gi;
+
+  let match:
+    | RegExpExecArray
+    | null;
+
+  while (
+    (
+      match =
+        headingPattern.exec(html)
+    ) !== null
+  ) {
+    const level =
+      Number(match[1]) as
+        | 2
+        | 3
+        | 4;
+
+    const attributes =
+      match[2] ?? "";
+
+    const label =
+      htmlToPlainText(
+        match[3] ?? "",
+      );
+
+    if (!label) {
+      continue;
+    }
+
+    const idMatch =
+      attributes.match(
+        /\bid=["']([^"']+)["']/i,
+      );
+      toc.push({
+  id:
+    idMatch?.[1] ??
+    (
+      normalizeSlug(label) ||
+      `seccion-${toc.length + 1}`
+    ),
+
+  label,
+  level,
+});
+  }
+
+  return toc;
+}
+
+function getErrorMessage(
+  error: unknown,
+): string {
+  return error instanceof Error
+    ? error.message
+    : "Ocurrió un error desconocido.";
+}
+
+const articleId =
+  Astro.params.id?.trim() ?? "";
+
+let article: any = null;
+let articleCategories: any[] = [];
+let relatedArticles: any[] = [];
+let loadError = "";
+
+if (!articleId) {
+  Astro.response.status = 404;
+} else {
+  try {
+    const supabase =
+      createSupabaseServerClient({
+        request: Astro.request,
+        cookies: Astro.cookies,
+      });
+
+    /*
+     * Valida la sesión actual.
+     */
+    const {
+      data: {
+        user,
+      },
+      error: userError,
+    } =
+      await supabase.auth.getUser();
+
+    if (
+      userError ||
+      !user
+    ) {
+      return mutableRedirect(
+        "/admin/login?error=Tu%20sesión%20expiró.%20Inicia%20sesión%20nuevamente.",
+      );
+    }
+
+    /*
+     * Verifica el rol administrativo.
+     */
+    const {
+      data: profile,
+      error: profileError,
+    } = await supabase
+      .from("profiles")
+      .select("id, role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      throw new Error(
+        `No fue posible verificar tus permisos: ${profileError.message}`,
+      );
+    }
+
+    if (
+      profile?.role !== "admin"
+    ) {
+      return mutableRedirect(
+        "/admin/login?error=Tu%20cuenta%20no%20tiene%20permisos%20de%20administrador.",
+      );
+    }
+
+    /*
+     * La vista previa puede cargar artículos
+     * publicados, borradores y archivados.
+     */
+    const {
+      data: articleRow,
+      error: articleError,
+    } = await supabase
+      .from("articles")
+      .select(`
+        id,
+        title,
+        subtitle,
+        slug,
+        summary,
+        status,
+        language_code,
+        lead_html,
+        content_html,
+        quick_facts,
+        is_featured,
+        featured_order,
+        published_at,
+        archived_at,
+        created_at,
+        updated_at
+      `)
+      .eq("id", articleId)
+      .maybeSingle();
+
+    if (articleError) {
+      throw new Error(
+        `No fue posible cargar el artículo: ${articleError.message}`,
+      );
+    }
+
+    if (!articleRow) {
+      Astro.response.status = 404;
+    } else {
+      const [
+        categoryLinksResult,
+        relationsResult,
+        aliasesResult,
+        statsResult,
+      ] = await Promise.all([
+        supabase
+          .from("article_categories")
+          .select("category_id")
+          .eq(
+            "article_id",
+            articleId,
+          ),
+
+        supabase
+          .from("article_relations")
+          .select(
+            "target_article_id",
+          )
+          .eq(
+            "source_article_id",
+            articleId,
+          )
+          .eq(
+            "relation_type",
+            "related",
+          )
+          .order(
+            "sort_order",
+            {
+              ascending: true,
+            },
+          ),
+
+        supabase
+          .from("article_redirects")
+          .select("old_slug")
+          .eq(
+            "article_id",
+            articleId,
+          )
+          .eq(
+            "reason",
+            "alias",
+          )
+          .eq(
+            "is_active",
+            true,
+          )
+          .order(
+            "created_at",
+            {
+              ascending: true,
+            },
+          ),
+
+        supabase
+          .from("article_stats")
+          .select("view_count")
+          .eq(
+            "article_id",
+            articleId,
+          )
+          .maybeSingle(),
+      ]);
+
+      if (
+        categoryLinksResult.error
+      ) {
+        throw new Error(
+          `No fue posible cargar las categorías: ${categoryLinksResult.error.message}`,
+        );
+      }
+
+      if (
+        relationsResult.error
+      ) {
+        throw new Error(
+          `No fue posible cargar los artículos relacionados: ${relationsResult.error.message}`,
+        );
+      }
+
+      if (
+        aliasesResult.error
+      ) {
+        throw new Error(
+          `No fue posible cargar los alias: ${aliasesResult.error.message}`,
+        );
+      }
+
+      if (
+        statsResult.error
+      ) {
+        console.warn(
+          "[vista-previa] No fue posible cargar las impresiones:",
+          statsResult.error,
+        );
+      }
+
+      const categoryIds =
+        (
+          categoryLinksResult.data ??
+          []
+        ).map(
+          (item) =>
+            item.category_id,
+        );
+
+      const relatedArticleIds =
+        (
+          relationsResult.data ??
+          []
+        ).map(
+          (item) =>
+            item.target_article_id,
+        );
+
+      const aliases =
+        (
+          aliasesResult.data ??
+          []
+        ).map(
+          (item) =>
+            item.old_slug,
+        );
+
+      /*
+       * Obtiene las categorías vinculadas.
+       */
+      if (
+        categoryIds.length > 0
+      ) {
+        const {
+          data: categoryRows,
+          error: categoryError,
+        } = await supabase
+          .from("categories")
+          .select(`
+            id,
+            name,
+            slug,
+            description
+          `)
+          .in(
+            "id",
+            categoryIds,
+          )
+          .order(
+            "name",
+            {
+              ascending: true,
+            },
+          );
+
+        if (categoryError) {
+          throw new Error(
+            `No fue posible cargar la información de las categorías: ${categoryError.message}`,
+          );
+        }
+
+        articleCategories =
+          categoryRows ?? [];
+      }
+
+      /*
+       * Conserva el comportamiento anterior:
+       * solamente muestra relacionados publicados.
+       */
+      if (
+        relatedArticleIds.length > 0
+      ) {
+        const {
+          data: relatedRows,
+          error: relatedError,
+        } = await supabase
+          .from("articles")
+          .select(`
+            id,
+            title,
+            subtitle,
+            slug,
+            summary,
+            status,
+            language_code,
+            lead_html,
+            content_html,
+            quick_facts,
+            is_featured,
+            featured_order,
+            published_at,
+            archived_at,
+            created_at,
+            updated_at
+          `)
+          .in(
+            "id",
+            relatedArticleIds,
+          )
+          .eq(
+            "status",
+            "published",
+          );
+
+        if (relatedError) {
+          throw new Error(
+            `No fue posible cargar los artículos relacionados: ${relatedError.message}`,
+          );
+        }
+
+        relatedArticles =
+          (
+            relatedRows ?? []
+          ).map(
+            (relatedRow) => {
+              const relatedLeadHtml =
+                relatedRow.lead_html ??
+                "";
+
+              const relatedContentHtml =
+                relatedRow.content_html ??
+                "";
+
+              return {
+                id:
+                  relatedRow.id,
+
+                title:
+                  relatedRow.title,
+
+                subtitle:
+                  relatedRow.subtitle ??
+                  "",
+
+                slug:
+                  relatedRow.slug,
+
+                summary:
+                  relatedRow.summary ??
+                  "",
+
+                status:
+                  relatedRow.status,
+
+                languageCode:
+                  relatedRow.language_code ??
+                  "es",
+
+                leadHtml:
+                  relatedLeadHtml,
+
+                contentHtml:
+                  relatedContentHtml,
+
+                contentJson:
+                  null,
+
+                plainText:
+                  htmlToPlainText(
+                    `${relatedLeadHtml} ${relatedContentHtml}`,
+                  ),
+
+                toc:
+                  extractToc(
+                    relatedContentHtml,
+                  ),
+
+                quickFacts:
+                  relatedRow.quick_facts ??
+                  defaultQuickFacts,
+
+                featured:
+                  relatedRow.is_featured ===
+                  true,
+
+                featuredOrder:
+                  relatedRow.featured_order ??
+                  null,
+
+                aliases: [],
+                categoryIds: [],
+                relatedArticleIds: [],
+
+                viewCount: 0,
+
+                publishedAt:
+                  relatedRow.published_at ??
+                  null,
+
+                archivedAt:
+                  relatedRow.archived_at ??
+                  null,
+
+                createdAt:
+                  relatedRow.created_at,
+
+                updatedAt:
+                  relatedRow.updated_at,
+              };
+            },
+          );
+      }
+
+      const leadHtml =
+        articleRow.lead_html ?? "";
+
+      const contentHtml =
+        articleRow.content_html ??
+        "";
+
+      article = {
+        id:
+          articleRow.id,
+
+        title:
+          articleRow.title,
+
+        subtitle:
+          articleRow.subtitle ??
+          "",
+
+        slug:
+          articleRow.slug,
+
+        summary:
+          articleRow.summary ??
+          "",
+
+        status:
+          articleRow.status,
+
+        languageCode:
+          articleRow.language_code ??
+          "es",
+
+        leadHtml,
+        contentHtml,
+
+        contentJson:
+          null,
+
+        plainText:
+          htmlToPlainText(
+            `${leadHtml} ${contentHtml}`,
+          ),
+
+        toc:
+          extractToc(
+            contentHtml,
+          ),
+
+        quickFacts:
+          articleRow.quick_facts ??
+          defaultQuickFacts,
+
+        featured:
+          articleRow.is_featured ===
+          true,
+
+        featuredOrder:
+          articleRow.featured_order ??
+          null,
+
+        aliases,
+        categoryIds,
+        relatedArticleIds,
+
+        viewCount:
+          Number(
+            statsResult.data
+              ?.view_count ?? 0,
+          ),
+
+        publishedAt:
+          articleRow.published_at ??
+          null,
+
+        archivedAt:
+          articleRow.archived_at ??
+          null,
+
+        createdAt:
+          articleRow.created_at,
+
+        updatedAt:
+          articleRow.updated_at,
+      };
+    }
+  } catch (error) {
+    console.error(
+      `[GET /admin/articulos/${articleId}/vista-previa]`,
+      error,
+    );
+
+    loadError =
+      getErrorMessage(error);
+
+    Astro.response.status = 500;
+  }
+}
 ---
 
 {
@@ -55,24 +647,57 @@ const relatedArticles = article
       description={article.summary}
       article
       toc={article.toc}
+      editHref={`/admin/articulos/${article.id}`}
+      historyHref={`/admin/articulos/${article.id}/historial`}
     >
       <ArticleView
         article={article}
         categories={articleCategories}
         relatedArticles={relatedArticles}
+        viewCount={article.viewCount}
         preview
       />
     </WikiLayout>
-  ) : (
-    <WikiLayout title="Artículo no encontrado">
+  ) : loadError ? (
+    <WikiLayout
+      title="Error al cargar la vista previa"
+      description="No fue posible cargar el artículo solicitado."
+    >
       <section class="not-found-page">
-        <p class="not-found-page__code">404</p>
+        <p class="not-found-page__code">
+          500
+        </p>
 
-        <h1>Artículo no encontrado</h1>
+        <h1>
+          No fue posible cargar la vista previa
+        </h1>
 
         <p>
-          No es posible generar la vista previa porque el
-          artículo no existe.
+          {loadError}
+        </p>
+
+        <a href="/admin/articulos">
+          Volver a artículos
+        </a>
+      </section>
+    </WikiLayout>
+  ) : (
+    <WikiLayout
+      title="Artículo no encontrado"
+      description="El artículo solicitado no existe."
+    >
+      <section class="not-found-page">
+        <p class="not-found-page__code">
+          404
+        </p>
+
+        <h1>
+          Artículo no encontrado
+        </h1>
+
+        <p>
+          No es posible generar la vista
+          previa porque el artículo no existe.
         </p>
 
         <a href="/admin/articulos">

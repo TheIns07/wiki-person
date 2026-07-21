@@ -1,143 +1,741 @@
 ---
-
 import WikiLayout from "../layouts/WikiLayout.astro";
-import { localWikiRepository } from "../lib/wiki/local-wiki-repository";
 
-const homepageData =
-  await localWikiRepository.getHomepageData();
+import {
+  createSupabaseServerClient,
+} from "../lib/supabase/server";
 
-const formatViews = (views: number): string =>
-  new Intl.NumberFormat("es-MX").format(views);
+export const prerender = false;
+
+Astro.response.headers.set(
+  "Cache-Control",
+  "no-store",
+);
+
+type PublishedArticleRow = {
+  id: string;
+  title: string;
+  slug: string;
+  summary: string | null;
+  is_featured: boolean;
+  featured_order: number | null;
+  published_at: string | null;
+  updated_at: string;
+};
+
+type ArticleStatsRow = {
+  article_id: string;
+  view_count:
+    | number
+    | string
+    | null;
+};
+
+type CategoryRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  sort_order: number;
+};
+
+type ArticleCategoryRow = {
+  article_id: string;
+  category_id: string;
+};
+
+type HomeArticle = {
+  id: string;
+  title: string;
+  slug: string;
+  summary: string;
+  featured: boolean;
+  featuredOrder: number | null;
+  publishedAt: string | null;
+  updatedAt: string;
+  viewCount: number;
+};
+
+type HomeCategory = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  articleCount: number;
+  sortOrder: number;
+};
+
+const numberFormatter =
+  new Intl.NumberFormat("es-MX");
+
+function getTimestamp(
+  value: string | null,
+): number {
+  if (!value) {
+    return 0;
+  }
+
+  const timestamp =
+    new Date(value).getTime();
+
+  return Number.isNaN(timestamp)
+    ? 0
+    : timestamp;
+}
+
+function getErrorMessage(
+  error: unknown,
+): string {
+  return error instanceof Error
+    ? error.message
+    : "Ocurrió un error desconocido.";
+}
+
+let articles: HomeArticle[] = [];
+let recentArticles: HomeArticle[] = [];
+let popularArticles: HomeArticle[] = [];
+let featuredArticle: HomeArticle | null = null;
+let categories: HomeCategory[] = [];
+let loadError = "";
+
+try {
+  const supabase =
+    createSupabaseServerClient({
+      request: Astro.request,
+      cookies: Astro.cookies,
+    });
+
+  /*
+   * La portada únicamente debe mostrar
+   * artículos publicados.
+   */
+  const {
+    data: articleData,
+    error: articleError,
+  } = await supabase
+    .from("articles")
+    .select(`
+      id,
+      title,
+      slug,
+      summary,
+      is_featured,
+      featured_order,
+      published_at,
+      updated_at
+    `)
+    .eq(
+      "status",
+      "published",
+    )
+    .order(
+      "published_at",
+      {
+        ascending: false,
+      },
+    )
+    .order(
+      "updated_at",
+      {
+        ascending: false,
+      },
+    );
+
+  if (articleError) {
+    throw new Error(
+      `No fue posible cargar los artículos: ${articleError.message}`,
+    );
+  }
+
+  const articleRows =
+    (
+      articleData ?? []
+    ) as PublishedArticleRow[];
+
+  const articleIds =
+    articleRows.map(
+      (article) =>
+        article.id,
+    );
+
+  const statsByArticleId =
+    new Map<string, number>();
+
+  let categoryRows: CategoryRow[] = [];
+  let articleCategoryRows:
+    ArticleCategoryRow[] = [];
+
+  if (articleIds.length > 0) {
+    const [
+      statsResult,
+      categoriesResult,
+      articleCategoriesResult,
+    ] = await Promise.all([
+      supabase
+        .from("article_stats")
+        .select(
+          "article_id, view_count",
+        )
+        .in(
+          "article_id",
+          articleIds,
+        ),
+
+      supabase
+        .from("categories")
+        .select(`
+          id,
+          name,
+          slug,
+          description,
+          sort_order
+        `)
+        .order(
+          "sort_order",
+          {
+            ascending: true,
+          },
+        )
+        .order(
+          "name",
+          {
+            ascending: true,
+          },
+        ),
+
+      supabase
+        .from(
+          "article_categories",
+        )
+        .select(
+          "article_id, category_id",
+        )
+        .in(
+          "article_id",
+          articleIds,
+        ),
+    ]);
+
+    /*
+     * Un error de estadísticas no debe evitar
+     * que aparezcan los artículos.
+     */
+    if (statsResult.error) {
+      console.warn(
+        "[GET /] No fue posible cargar las impresiones:",
+        statsResult.error,
+      );
+    } else {
+      const statsRows =
+        (
+          statsResult.data ?? []
+        ) as ArticleStatsRow[];
+
+      for (
+        const statsRow of statsRows
+      ) {
+        statsByArticleId.set(
+          statsRow.article_id,
+          Number(
+            statsRow.view_count ?? 0,
+          ),
+        );
+      }
+    }
+
+    if (categoriesResult.error) {
+      console.warn(
+        "[GET /] No fue posible cargar las categorías:",
+        categoriesResult.error,
+      );
+    } else {
+      categoryRows =
+        (
+          categoriesResult.data ??
+          []
+        ) as CategoryRow[];
+    }
+
+    if (
+      articleCategoriesResult.error
+    ) {
+      console.warn(
+        "[GET /] No fue posible cargar las relaciones de categorías:",
+        articleCategoriesResult.error,
+      );
+    } else {
+      articleCategoryRows =
+        (
+          articleCategoriesResult.data ??
+          []
+        ) as ArticleCategoryRow[];
+    }
+  }
+
+  articles =
+    articleRows.map(
+      (articleRow) => ({
+        id:
+          articleRow.id,
+
+        title:
+          articleRow.title,
+
+        slug:
+          articleRow.slug,
+
+        summary:
+          articleRow.summary ??
+          "",
+
+        featured:
+          articleRow.is_featured ===
+          true,
+
+        featuredOrder:
+          articleRow.featured_order,
+
+        publishedAt:
+          articleRow.published_at,
+
+        updatedAt:
+          articleRow.updated_at,
+
+        viewCount:
+          statsByArticleId.get(
+            articleRow.id,
+          ) ?? 0,
+      }),
+    );
+
+  /*
+   * Los primeros cinco son los artículos
+   * publicados más recientemente.
+   */
+  recentArticles =
+    articles.slice(0, 5);
+
+  /*
+   * Primero se busca un artículo marcado como
+   * destacado. Si no existe, se utiliza el
+   * artículo publicado más reciente.
+   */
+  featuredArticle =
+    [...articles]
+      .filter(
+        (article) =>
+          article.featured,
+      )
+      .sort(
+        (
+          firstArticle,
+          secondArticle,
+        ) => {
+          const firstOrder =
+            firstArticle
+              .featuredOrder ??
+            Number.MAX_SAFE_INTEGER;
+
+          const secondOrder =
+            secondArticle
+              .featuredOrder ??
+            Number.MAX_SAFE_INTEGER;
+
+          if (
+            firstOrder !==
+            secondOrder
+          ) {
+            return (
+              firstOrder -
+              secondOrder
+            );
+          }
+
+          return (
+            getTimestamp(
+              secondArticle
+                .publishedAt,
+            ) -
+            getTimestamp(
+              firstArticle
+                .publishedAt,
+            )
+          );
+        },
+      )[0] ??
+    recentArticles[0] ??
+    null;
+
+  /*
+   * Artículos con más impresiones.
+   */
+  popularArticles =
+    [...articles]
+      .sort(
+        (
+          firstArticle,
+          secondArticle,
+        ) => {
+          if (
+            secondArticle
+              .viewCount !==
+            firstArticle
+              .viewCount
+          ) {
+            return (
+              secondArticle
+                .viewCount -
+              firstArticle
+                .viewCount
+            );
+          }
+
+          return (
+            getTimestamp(
+              secondArticle
+                .publishedAt,
+            ) -
+            getTimestamp(
+              firstArticle
+                .publishedAt,
+            )
+          );
+        },
+      )
+      .slice(0, 5);
+
+  /*
+   * Cuenta cuántos artículos publicados
+   * pertenecen a cada categoría.
+   */
+  const categoryCountById =
+    new Map<string, number>();
+
+  for (
+    const articleCategory of
+      articleCategoryRows
+  ) {
+    const currentCount =
+      categoryCountById.get(
+        articleCategory.category_id,
+      ) ?? 0;
+
+    categoryCountById.set(
+      articleCategory.category_id,
+      currentCount + 1,
+    );
+  }
+
+  categories =
+    categoryRows
+      .map(
+        (categoryRow) => ({
+          id:
+            categoryRow.id,
+
+          name:
+            categoryRow.name,
+
+          slug:
+            categoryRow.slug,
+
+          description:
+            categoryRow.description ??
+            "",
+
+          sortOrder:
+            categoryRow.sort_order,
+
+          articleCount:
+            categoryCountById.get(
+              categoryRow.id,
+            ) ?? 0,
+        }),
+      )
+      .filter(
+        (category) =>
+          category.articleCount > 0,
+      )
+      .sort(
+        (
+          firstCategory,
+          secondCategory,
+        ) => {
+          if (
+            secondCategory
+              .articleCount !==
+            firstCategory
+              .articleCount
+          ) {
+            return (
+              secondCategory
+                .articleCount -
+              firstCategory
+                .articleCount
+            );
+          }
+
+          if (
+            firstCategory
+              .sortOrder !==
+            secondCategory
+              .sortOrder
+          ) {
+            return (
+              firstCategory
+                .sortOrder -
+              secondCategory
+                .sortOrder
+            );
+          }
+
+          return firstCategory
+            .name
+            .localeCompare(
+              secondCategory.name,
+              "es",
+            );
+        },
+      )
+      .slice(0, 6);
+} catch (error) {
+  console.error(
+    "[GET /] Error cargando la portada:",
+    error,
+  );
+
+  loadError =
+    getErrorMessage(error);
+}
 ---
 
 <WikiLayout
-  title={homepageData.settings.siteName}
-  description={homepageData.settings.description}
+  title="Portada"
+  description="Archivo privado de conocimiento y documentación."
 >
   <section class="home-welcome">
-    <h1>{homepageData.homepage.welcomeTitle}</h1>
+    <h1>
+      Bienvenido a la Enciclopedia personal
+    </h1>
 
-    <p>{homepageData.homepage.welcomeDescription}</p>
+    <p>
+      Un espacio para documentar temas,
+      investigaciones y acontecimientos
+      conectados mediante hipertexto.
+    </p>
 
     <p class="home-welcome__count">
-      Actualmente contiene
+      Actualmente contiene{" "}
       <strong>
-        {homepageData.publishedArticleCount}
-      </strong>
+        {
+          numberFormatter.format(
+            articles.length,
+          )
+        }
+      </strong>{" "}
       {
-        homepageData.publishedArticleCount === 1
-          ? " artículo publicado"
-          : " artículos publicados"
-      }.
+        articles.length === 1
+          ? "artículo publicado."
+          : "artículos publicados."
+      }
     </p>
   </section>
 
-  <div class="home-grid">
-    <section class="home-panel">
-      <h2>Artículo destacado</h2>
+  {
+    loadError ? (
+      <section
+        class="home-panel"
+        style="margin-top: 24px;"
+      >
+        <h2>
+          No fue posible cargar la portada
+        </h2>
 
-      {
-        homepageData.featuredArticle ? (
-          <>
-            <p>
-              <strong>
-                <a
-                  href={`/wiki/${homepageData.featuredArticle.slug}`}
-                >
-                  {homepageData.featuredArticle.title}
-                </a>
-              </strong>
-            </p>
+        <p>
+          {loadError}
+        </p>
 
-            <p>
-              {homepageData.featuredArticle.summary}
-            </p>
+        <p>
+          <a href="/">
+            Volver a intentar
+          </a>
+        </p>
+      </section>
+    ) : (
+      <div class="home-grid">
+        <section class="home-panel">
+          <h2>
+            Artículo destacado
+          </h2>
 
-            <p class="home-panel__metadata">
-              {formatViews(
-                homepageData.featuredArticle.viewCount,
-              )}{" "}
-              impresiones
-            </p>
-          </>
-        ) : (
-          <p>No se ha seleccionado un artículo destacado.</p>
-        )
-      }
-    </section>
-
-    <section class="home-panel">
-      <h2>Artículos recientes</h2>
-
-      {
-        homepageData.recentArticles.length > 0 ? (
-          <ul class="article-list">
-            {homepageData.recentArticles.map((article) => (
-              <li>
-                <a href={`/wiki/${article.slug}`}>
-                  {article.title}
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No hay artículos publicados.</p>
-        )
-      }
-    </section>
-
-    <section class="home-panel">
-      <h2>Más consultados</h2>
-
-      {
-        homepageData.popularArticles.length > 0 ? (
-          <ol class="article-list popular-article-list">
-            {homepageData.popularArticles.map((article) => (
-              <li>
-                <a href={`/wiki/${article.slug}`}>
-                  {article.title}
-                </a>
-
-                <span>
-                  {formatViews(article.viewCount)}
-                </span>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p>Todavía no hay información de consultas.</p>
-        )
-      }
-    </section>
-
-    <section class="home-panel">
-      <h2>Categorías principales</h2>
-
-      {
-        homepageData.visibleCategories.length > 0 ? (
-          <ul class="article-list">
-            {homepageData.visibleCategories.map(
-              (category) => (
-                <li>
-                  <a href={`/categoria/${category.slug}`}>
-                    {category.name}
+          {
+            featuredArticle ? (
+              <>
+                <h3>
+                  <a
+                    href={`/wiki/${featuredArticle.slug}`}
+                  >
+                    {
+                      featuredArticle.title
+                    }
                   </a>
+                </h3>
 
+                <p>
                   {
-                    category.description && (
-                      <p class="category-description">
-                        {category.description}
-                      </p>
-                    )
+                    featuredArticle.summary ||
+                    "Este artículo no tiene un resumen disponible."
                   }
-                </li>
-              ),
-            )}
-          </ul>
-        ) : (
-          <p>No hay categorías configuradas.</p>
-        )
-      }
-    </section>
-  </div>
+                </p>
+
+                <p class="home-panel__metadata">
+                  {
+                    numberFormatter.format(
+                      featuredArticle.viewCount,
+                    )
+                  }{" "}
+                  {
+                    featuredArticle.viewCount ===
+                    1
+                      ? "impresión"
+                      : "impresiones"
+                  }
+                </p>
+              </>
+            ) : (
+              <p>
+                Todavía no hay artículos
+                publicados.
+              </p>
+            )
+          }
+        </section>
+
+        <section class="home-panel">
+          <h2>
+            Artículos recientes
+          </h2>
+
+          {
+            recentArticles.length > 0 ? (
+              <ul class="article-list">
+                {
+                  recentArticles.map(
+                    (article) => (
+                      <li>
+                        <a
+                          href={`/wiki/${article.slug}`}
+                        >
+                          {article.title}
+                        </a>
+                      </li>
+                    ),
+                  )
+                }
+              </ul>
+            ) : (
+              <p>
+                Todavía no hay artículos
+                publicados.
+              </p>
+            )
+          }
+        </section>
+
+        <section class="home-panel">
+          <h2>
+            Más consultados
+          </h2>
+
+          {
+            popularArticles.length > 0 ? (
+              <ol class="article-list popular-article-list">
+                {
+                  popularArticles.map(
+                    (article) => (
+                      <li>
+                        <a
+                          href={`/wiki/${article.slug}`}
+                        >
+                          {article.title}
+                        </a>
+
+                        <span>
+                          {
+                            numberFormatter.format(
+                              article.viewCount,
+                            )
+                          }
+                        </span>
+                      </li>
+                    ),
+                  )
+                }
+              </ol>
+            ) : (
+              <p>
+                Todavía no hay estadísticas
+                disponibles.
+              </p>
+            )
+          }
+        </section>
+
+        <section class="home-panel">
+          <h2>
+            Categorías principales
+          </h2>
+
+          {
+            categories.length > 0 ? (
+              <ul class="article-list">
+                {
+                  categories.map(
+                    (category) => (
+                      <li>
+                        <a
+                          href={`/buscar?q=${encodeURIComponent(
+                            category.name,
+                          )}`}
+                        >
+                          {category.name}
+                        </a>
+
+                        <span>
+                          {" "}
+                          (
+                          {
+                            numberFormatter.format(
+                              category.articleCount,
+                            )
+                          }
+                          )
+                        </span>
+
+                        {
+                          category.description && (
+                            <p class="category-description">
+                              {
+                                category.description
+                              }
+                            </p>
+                          )
+                        }
+                      </li>
+                    ),
+                  )
+                }
+              </ul>
+            ) : (
+              <p>
+                Todavía no hay categorías
+                asignadas a artículos
+                publicados.
+              </p>
+            )
+          }
+        </section>
+      </div>
+    )
+  }
 </WikiLayout>
